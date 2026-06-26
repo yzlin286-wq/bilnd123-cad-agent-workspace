@@ -73,7 +73,7 @@ async function callOpenAICompatibleModel({
         {
           role: "system",
           content:
-            "You are a CAD agent planner. Return a compact JSON object with engineeringSpec, workflowSteps, requiredArtifacts, validationChecks, and openQuestions. Do not generate fallback CAD code.",
+            "You are a CAD agent planner. Return only JSON with an engineeringSpec object. Required engineeringSpec fields: length, width, thickness, holeDiameter, edgeOffset, chamfer, material, units. Use millimeters unless the user explicitly asks otherwise. Do not generate fallback CAD code.",
         },
         {
           role: "user",

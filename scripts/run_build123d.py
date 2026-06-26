@@ -20,14 +20,26 @@ def main() -> int:
         spec = normalize_spec(request.get("spec", {}))
         validate_spec(spec)
         run_dir = make_run_dir(request.get("outputDir"))
-        build_outputs = run_build123d(spec, run_dir)
+        build_result = run_build123d(spec, run_dir)
         source_path = run_dir / "source.py"
         source_path.write_text(render_source(spec), encoding="utf-8")
 
         drawing_path = write_svg_drawing(spec, run_dir / "drawing.svg")
-        validation_path = write_validation(spec, run_dir / "validation.json")
+        validation_path = write_validation(spec, build_result["metrics"], run_dir / "validation.json")
         spec_path = run_dir / "spec.json"
         spec_path.write_text(json.dumps(spec, indent=2), encoding="utf-8")
+        manifest_path = write_manifest(
+            spec,
+            build_result["metrics"],
+            {
+                **build_result["artifacts"],
+                "drawingSvg": drawing_path,
+                "source": source_path,
+                "spec": spec_path,
+                "validation": validation_path,
+            },
+            run_dir / "manifest.json",
+        )
         log_path = run_dir / "run.log"
         log_path.write_text(
             "\n".join(
@@ -35,8 +47,10 @@ def main() -> int:
                     f"{iso_now()} parse_spec ok",
                     f"{iso_now()} run_build123d ok",
                     f"{iso_now()} export_step ok",
+                    f"{iso_now()} export_stl ok",
                     f"{iso_now()} render_svg_drawing ok",
                     f"{iso_now()} validate_geometry ok",
+                    f"{iso_now()} write_manifest ok",
                 ]
             ),
             encoding="utf-8",
@@ -48,11 +62,12 @@ def main() -> int:
                     "ok": True,
                     "runDir": str(run_dir),
                     "artifacts": {
-                        **build_outputs,
+                        **{key: str(value) for key, value in build_result["artifacts"].items()},
                         "drawingSvg": str(drawing_path),
                         "source": str(source_path),
                         "spec": str(spec_path),
                         "validation": str(validation_path),
+                        "manifest": str(manifest_path),
                         "log": str(log_path),
                     },
                 },
@@ -115,9 +130,20 @@ def make_run_dir(output_dir: Any) -> Path:
     return run_dir
 
 
-def run_build123d(spec: dict[str, Any], run_dir: Path) -> dict[str, str]:
+def run_build123d(spec: dict[str, Any], run_dir: Path) -> dict[str, Any]:
     try:
-        from build123d import Axis, Box, BuildPart, Hole, Locations, export_step, fillet
+        from build123d import (
+            Axis,
+            Box,
+            BuildPart,
+            GeomType,
+            Hole,
+            Locations,
+            export_step,
+            export_stl,
+            fillet,
+            import_step,
+        )
     except Exception as exc:  # pragma: no cover - depends on local CAD install
         raise RuntimeError(
             "build123d is not installed or cannot load Open Cascade. Install requirements.txt and retry."
@@ -143,8 +169,34 @@ def run_build123d(spec: dict[str, Any], run_dir: Path) -> dict[str, str]:
             fillet(plate.edges().filter_by(Axis.Z), radius=chamfer)
 
     step_path = run_dir / "model.step"
+    stl_path = run_dir / "model.stl"
     export_step(plate.part, str(step_path))
-    return {"step": str(step_path)}
+    export_stl(plate.part, str(stl_path))
+
+    bbox = plate.part.bounding_box()
+    cyl_faces = plate.part.faces().filter_by(GeomType.CYLINDER)
+    cylinder_radii = sorted(round(face.radius, 6) for face in cyl_faces)
+    hole_radius = round(hole_dia / 2, 6)
+    hole_cylinder_radii = [radius for radius in cylinder_radii if abs(radius - hole_radius) < 0.001]
+    reloaded = import_step(str(step_path))
+    reloaded_bbox = reloaded.bounding_box()
+
+    metrics = {
+        "bbox": vector_to_dict(bbox.size),
+        "bboxMin": vector_to_dict(bbox.min),
+        "bboxMax": vector_to_dict(bbox.max),
+        "stepReloadedBbox": vector_to_dict(reloaded_bbox.size),
+        "solidCount": len(plate.part.solids()),
+        "faceCount": len(plate.part.faces()),
+        "edgeCount": len(plate.part.edges()),
+        "cylindricalFaceCount": len(cyl_faces),
+        "cylinderRadii": cylinder_radii,
+        "holeCylindricalFaceCount": len(hole_cylinder_radii),
+        "holeCylinderRadii": hole_cylinder_radii,
+        "stepBytes": step_path.stat().st_size,
+        "stlBytes": stl_path.stat().st_size,
+    }
+    return {"artifacts": {"step": step_path, "stl": stl_path}, "metrics": metrics}
 
 
 def write_svg_drawing(spec: dict[str, Any], path: Path) -> Path:
@@ -180,15 +232,31 @@ def write_svg_drawing(spec: dict[str, Any], path: Path) -> Path:
     return path
 
 
-def write_validation(spec: dict[str, Any], path: Path) -> Path:
+def write_validation(spec: dict[str, Any], metrics: dict[str, Any], path: Path) -> Path:
     checks = [
-        check("bbox_x", spec["length"], spec["length"]),
-        check("bbox_y", spec["width"], spec["width"]),
-        check("bbox_z", spec["thickness"], spec["thickness"]),
-        check("hole_count", 4, 4),
-        check("hole_offset", spec["edgeOffset"], spec["edgeOffset"]),
+        check("bbox_x", spec["length"], metrics["bbox"]["x"]),
+        check("bbox_y", spec["width"], metrics["bbox"]["y"]),
+        check("bbox_z", spec["thickness"], metrics["bbox"]["z"]),
+        check("step_reload_bbox_x", spec["length"], metrics["stepReloadedBbox"]["x"]),
+        check("step_reload_bbox_y", spec["width"], metrics["stepReloadedBbox"]["y"]),
+        check("step_reload_bbox_z", spec["thickness"], metrics["stepReloadedBbox"]["z"]),
+        check("solid_count", 1, metrics["solidCount"]),
+        check("hole_cylindrical_face_count", 4, metrics["holeCylindricalFaceCount"]),
+        check("hole_radius", spec["holeDiameter"] / 2, min(metrics["holeCylinderRadii"] or [0])),
+        min_file_size_check("step_file", metrics["stepBytes"]),
+        min_file_size_check("stl_file", metrics["stlBytes"]),
     ]
-    path.write_text(json.dumps({"passed": all(item["passed"] for item in checks), "checks": checks}, indent=2), encoding="utf-8")
+    path.write_text(
+        json.dumps(
+            {
+                "passed": all(item["passed"] for item in checks),
+                "checks": checks,
+                "metrics": metrics,
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
     return path
 
 
@@ -199,6 +267,79 @@ def check(name: str, expected: float, actual: float) -> dict[str, Any]:
         "actual": actual,
         "passed": abs(float(expected) - float(actual)) < 0.001,
     }
+
+
+def min_file_size_check(name: str, actual: int) -> dict[str, Any]:
+    return {
+        "name": name,
+        "expected": "> 0 bytes",
+        "actual": actual,
+        "passed": actual > 0,
+    }
+
+
+def write_manifest(
+    spec: dict[str, Any],
+    metrics: dict[str, Any],
+    artifacts: dict[str, Path],
+    path: Path,
+) -> Path:
+    manifest = {
+        "revisionId": path.parent.name,
+        "createdAt": iso_now(),
+        "engineeringSpec": spec,
+        "parameterManifest": [
+            parameter("length", "Length", spec["length"], "mm", 20, 240),
+            parameter("width", "Width", spec["width"], "mm", 20, 200),
+            parameter("thickness", "Thickness", spec["thickness"], "mm", 1, 20),
+            parameter("holeDiameter", "Hole diameter", spec["holeDiameter"], "mm", 2, 16),
+            parameter("edgeOffset", "Edge offset", spec["edgeOffset"], "mm", 3, 40),
+            parameter("chamfer", "Chamfer", spec["chamfer"], "mm", 0, 6),
+        ],
+        "artifacts": [
+            artifact("step", "STEP", artifacts["step"]),
+            artifact("stl", "Preview mesh", artifacts["stl"]),
+            artifact("drawingSvg", "Drawing", artifacts["drawingSvg"]),
+            artifact("source", "build123d source", artifacts["source"]),
+            artifact("spec", "Engineering spec", artifacts["spec"]),
+            artifact("validation", "Validation report", artifacts["validation"]),
+        ],
+        "metrics": metrics,
+    }
+    path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+    return path
+
+
+def parameter(
+    key: str,
+    label: str,
+    value: float,
+    unit: str,
+    minimum: float,
+    maximum: float,
+) -> dict[str, Any]:
+    return {
+        "key": key,
+        "label": label,
+        "value": value,
+        "unit": unit,
+        "min": minimum,
+        "max": maximum,
+    }
+
+
+def artifact(kind: str, label: str, path: Path) -> dict[str, Any]:
+    return {
+        "kind": kind,
+        "label": label,
+        "name": path.name,
+        "path": str(path),
+        "bytes": path.stat().st_size,
+    }
+
+
+def vector_to_dict(vector: Any) -> dict[str, float]:
+    return {"x": float(vector.X), "y": float(vector.Y), "z": float(vector.Z)}
 
 
 def render_source(spec: dict[str, Any]) -> str:

@@ -1,23 +1,57 @@
-# CAD Agent Workspace
+# Build123d CAD Agent
 
-First runnable version of an AI CAD Agent Workspace. The app is a dense engineering UI rather than a landing page: project/revision navigation, ChatGPT-like agent thread, workstream timeline, CAD canvas, drawing preview, parameters, artifacts, validation report, and build123d source view.
+Adam/CADAM-like AI CAD Agent workspace built with Next.js, React, Three.js, and build123d.
+
+The product surface is intentionally user-facing: users start with natural language, then watch an agent workstream create an engineering spec, run the CAD kernel, validate geometry, and expose real artifacts for preview and download.
+
+## Product Shape
+
+- Landing page: `Build CAD with natural language`
+- Workspace: narrow history rail, ChatGPT-like agent thread, and CAD artifact canvas
+- Workstream: understanding request, engineering spec, build123d source, CAD kernel, STEP export, preview mesh, validation, packaging
+- CAD Canvas tabs: Preview, Drawing, Parameters, Files
+- No user-facing runtime/debug controls
+
+## No Fallback Policy
+
+This project must not fabricate CAD or agent results.
+
+- Natural-language generation goes through `POST /api/agent/run`.
+- `/api/agent/run` requires a real OpenAI-compatible model endpoint.
+- The only allowed model fallback is a configured downgrade to another real model.
+- If the AI engine is missing, the UI shows a friendly connection message and does not generate fake CAD.
+- Parameter rebuilds go through `POST /api/cad/rebuild` and require a real `CAD_RUNNER_COMMAND`.
+- If build123d is unavailable, the runner exits non-zero and no fake artifacts are produced.
+
+## Real CAD Artifacts
+
+The build123d runner writes real files under `outputs/cad/<revision>/`:
+
+- `model.step`
+- `model.stl`
+- `drawing.svg`
+- `source.py`
+- `spec.json`
+- `validation.json`
+- `manifest.json`
+- `run.log`
+
+`validation.json` is based on real build123d/STEP evidence:
+
+- generated part bounding box
+- STEP reload bounding box
+- solid count
+- face/edge count
+- cylindrical hole-face count
+- hole radius measurement
+- exported file sizes
 
 ## Stack
 
 - Next.js 16 and React 19
-- React Three Fiber and Three.js for the CAD preview canvas
-- React Flow for the agent workflow view
-- Monaco Editor for the build123d source panel
-- Lucide icons and custom CSS for the product shell
-
-## No Fallback Policy
-
-This project must not synthesize fake agent or CAD results when real infrastructure is missing.
-
-- `/api/agent/workstream` requires a real OpenAI-compatible model endpoint.
-- The only allowed model fallback is a configured downgrade to another real model.
-- `/api/cad/runs` requires `CAD_RUNNER_COMMAND`.
-- Missing LLM or CAD runtime returns explicit `503` errors.
+- React Three Fiber and Three.js for real STL preview
+- build123d for CAD generation and STEP/STL export
+- Lucide icons and custom CSS for the AI product shell
 
 ## Environment
 
@@ -31,7 +65,14 @@ CAD_AGENT_DOWNGRADE_MODEL=secondary-real-model
 CAD_RUNNER_COMMAND=python scripts/run_build123d.py
 ```
 
-The CAD runner receives JSON on stdin. It should execute the real build123d pipeline and write a structured result to stdout. It should fail with a non-zero exit code when CAD generation fails.
+For local build123d validation on Windows:
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+$env:CAD_RUNNER_COMMAND = '.\.venv\Scripts\python.exe scripts/run_build123d.py'
+npm run dev
+```
 
 ## Commands
 
@@ -49,24 +90,10 @@ Local development URL:
 http://127.0.0.1:3000
 ```
 
-## Current Scope
+## Main APIs
 
-Implemented:
+- `POST /api/agent/run`: SSE agent orchestration endpoint
+- `POST /api/cad/rebuild`: rebuilds a revision from an explicit parameter/spec payload
+- `GET /api/artifacts/[id]`: streams generated artifacts from local output storage
 
-- CAD Agent Workspace product shell
-- Project, revision, artifact, and validation UI
-- Interactive prompt composer
-- Three.js mounting plate preview
-- SVG drawing preview
-- Parameter, measurement, workflow, and source panels
-- Runtime readiness API
-- Real LLM workstream API boundary
-- Real CAD runner API boundary
-
-Not yet wired:
-
-- Auth and persistence
-- Real artifact storage
-- Production build123d runner implementation
-- Streaming SSE event transport
-- Version diff and approval persistence
+Legacy diagnostic endpoints may remain for development, but the user-facing app is driven by the agent/rebuild/artifact flow above.
