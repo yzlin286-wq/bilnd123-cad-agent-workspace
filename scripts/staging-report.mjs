@@ -14,18 +14,25 @@ export async function generateStagingReport({
   smokePath = DEFAULT_SMOKE_PATH,
   outputPath = DEFAULT_OUTPUT_PATH,
 } = {}) {
-  const [summary, classification, smoke] = await Promise.all([
+  const [summary, classification, smokeRecord] = await Promise.all([
     summarizeRunHistory({ logPath }),
     classifyRunHistory({ logPath }),
-    readJSONIfExists(smokePath),
+    readJSONRecordIfExists(smokePath),
   ]);
-  const markdown = renderReport({ summary, classification, smoke, generatedAt: new Date().toISOString() });
+  const smoke = smokeRecord?.payload;
+  const markdown = renderReport({
+    summary,
+    classification,
+    smoke,
+    smokeUpdatedAt: smokeRecord?.updatedAt,
+    generatedAt: new Date().toISOString(),
+  });
   await fs.mkdir(path.dirname(outputPath), { recursive: true });
   await fs.writeFile(outputPath, markdown, "utf8");
   return { outputPath, summary, classification, smokePresent: Boolean(smoke) };
 }
 
-export function renderReport({ summary, classification, smoke, generatedAt }) {
+export function renderReport({ summary, classification, smoke, smokeUpdatedAt, generatedAt }) {
   const lines = [
     "# Staging Observation Report",
     "",
@@ -53,6 +60,7 @@ export function renderReport({ summary, classification, smoke, generatedAt }) {
     `- Failure runs: ${classification.failureRuns}`,
     `- Expected failures: ${classification.expectedFailureCount}`,
     `- Unexpected failures: ${classification.unexpectedFailureCount}`,
+    `- Expected vs unexpected failure ratio: ${formatFailureRatio(classification.expectedFailureCount, classification.unexpectedFailureCount)}`,
     "",
     "### Expected By Reason",
     "",
@@ -68,15 +76,23 @@ export function renderReport({ summary, classification, smoke, generatedAt }) {
     "",
     "## Latest Smoke",
     "",
-    ...smokeLines(smoke),
+    ...smokeLines(smoke, smokeUpdatedAt, generatedAt),
+    "",
+    "## Action Items",
+    "",
+    ...actionItemLines({ classification, smoke }),
     "",
   ];
   return `${lines.join("\n")}\n`;
 }
 
-async function readJSONIfExists(filePath) {
+async function readJSONRecordIfExists(filePath) {
   try {
-    return JSON.parse(await fs.readFile(filePath, "utf8"));
+    const [text, stats] = await Promise.all([fs.readFile(filePath, "utf8"), fs.stat(filePath)]);
+    return {
+      payload: JSON.parse(text),
+      updatedAt: stats.mtime.toISOString(),
+    };
   } catch (error) {
     if (error?.code === "ENOENT") return undefined;
     throw error;
@@ -96,12 +112,16 @@ function recentUnexpectedLines(items) {
   );
 }
 
-function smokeLines(smoke) {
+function smokeLines(smoke, smokeUpdatedAt, generatedAt) {
   if (!smoke) return ["- No smoke output found. Run `npm run smoke:staging -- --output outputs/smoke/latest.json`."];
+  const smokeTimestamp = smoke.generatedAt || smokeUpdatedAt;
   return [
     `- OK: ${Boolean(smoke.ok)}`,
+    `- Latest smoke passed: ${Boolean(smoke.ok)}`,
+    `- Last smoke age: ${formatAge(smokeTimestamp, generatedAt)}`,
     `- Duration: ${smoke.durationMs ?? "n/a"} ms`,
     `- HTTPS configured: ${Boolean(smoke.health?.httpsConfigured)}`,
+    `- Access mode: ${smoke.health?.accessMode || "unknown"}`,
     `- Warning: ${smoke.health?.warning || "none"}`,
     `- Rev001: ${smoke.rev001?.id || "missing"} | validation ${Boolean(smoke.rev001?.validationPassed)}`,
     `- Rev002: ${smoke.rev002?.id || "missing"} | validation ${Boolean(smoke.rev002?.validationPassed)}`,
@@ -109,8 +129,45 @@ function smokeLines(smoke) {
   ];
 }
 
+function actionItemLines({ classification, smoke }) {
+  const items = [];
+  if (classification.unexpectedFailureCount > 0) {
+    items.push("Triage unexpected failures first using `docs/FAILURE_TRIAGE.md`, then convert reproducible cases into tests.");
+  }
+  if (!smoke) {
+    items.push("Run staging smoke and persist it with `npm run smoke:staging -- --output outputs/smoke/latest.json`.");
+  } else if (!smoke.ok) {
+    items.push("Investigate the latest failed smoke before inviting more internal testers.");
+  }
+  if (smoke?.health?.httpsConfigured === false) {
+    items.push("Restrict access or enable HTTPS before broad internal trial traffic.");
+  }
+  if (!items.length) return ["- none"];
+  return items.map((item) => `- ${item}`);
+}
+
 function formatPercent(value) {
   return `${Math.round(Number(value || 0) * 100)}%`;
+}
+
+function formatFailureRatio(expectedCount, unexpectedCount) {
+  const total = expectedCount + unexpectedCount;
+  if (!total) return "n/a (0 failures)";
+  return `expected ${formatPercent(expectedCount / total)} / unexpected ${formatPercent(unexpectedCount / total)}`;
+}
+
+function formatAge(timestamp, generatedAt) {
+  if (!timestamp) return "unknown";
+  const then = Date.parse(timestamp);
+  const now = Date.parse(generatedAt);
+  if (!Number.isFinite(then) || !Number.isFinite(now)) return "unknown";
+  const ageMs = Math.max(0, now - then);
+  const minutes = Math.floor(ageMs / 60_000);
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+  if (days > 0) return `${days}d ${hours % 24}h`;
+  if (hours > 0) return `${hours}h ${minutes % 60}m`;
+  return `${minutes}m`;
 }
 
 function parseArgs(argv) {

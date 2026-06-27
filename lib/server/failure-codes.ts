@@ -29,3 +29,24 @@ export function operationalErrorCode(error: unknown, fallback: string) {
   }
   return fallback;
 }
+
+const USER_MESSAGES: Record<string, string> = {
+  UNSUPPORTED_PART_TYPE: "This request is outside the supported staging templates. Use mounting_plate or l_bracket.",
+  PARAMETER_CONFLICT:
+    "The requested dimensions conflict with the CAD template constraints. Adjust hole size, edge offset, chamfer, or part dimensions.",
+  LLM_JSON_ERROR: "The AI model returned a spec the app could not validate. Try a more specific prompt or retry.",
+  CAD_RUNNER_CRASH: "The CAD kernel could not complete this run. Retry once, then escalate with the run id.",
+  VALIDATION_FAILED: "The CAD model was generated but failed geometry validation. Adjust the parameters or report this revision.",
+  RATE_LIMITED: "Too many CAD requests. Please wait a minute and try again.",
+  CAD_ENGINE_NOT_CONNECTED: "CAD engine not connected. Connect build123d before rebuilding files.",
+  AI_ENGINE_NOT_CONNECTED: "AI CAD engine not connected. Add your model endpoint before using natural language CAD.",
+  INVALID_JSON: "Invalid request body. Send valid JSON and try again.",
+  PROMPT_REQUIRED: "Prompt is required.",
+  PROMPT_TOO_LONG: "Prompt is too long. Shorten the request and try again.",
+  REVISION_REQUEST_REQUIRED: "currentSpec, currentRevisionId, and userPrompt are required.",
+  SPEC_REQUIRED: "spec is required.",
+};
+
+export function userMessageForErrorCode(errorCode: string, fallback = "The CAD agent could not complete this request. Try again or report the run id.") {
+  return USER_MESSAGES[errorCode] ?? fallback;
+}

@@ -103,6 +103,57 @@ Do not treat IP-only HTTP as a durable internal trial setup. Use one of these te
 
 If using the existing `12601` HTTP compose for a short smoke, keep Basic Auth enabled and limit exposure with firewall rules.
 
+### Temporary Option A: Cloud Firewall IP Allowlist
+
+Use this only for a small tester set with stable egress IPs.
+
+1. Collect tester public egress CIDRs out of band. Do not commit them.
+2. In the cloud firewall or security group, allow inbound TCP only on the selected staging port from those CIDRs.
+3. Remove any `0.0.0.0/0` or `::/0` rule for the staging port.
+4. Keep SSH restricted separately; do not open SSH as part of CAD testing.
+5. Confirm from an unlisted network that `/api/health` is unreachable.
+6. Confirm from an allowlisted network that unauthenticated `/api/health` returns `401`.
+7. Set the server-only `.env` value:
+
+```bash
+STAGING_ACCESS_MODE=http_restricted
+```
+
+### Temporary Option B: Tailscale
+
+Use this when testers can join a private mesh network.
+
+1. Install Tailscale on the staging host and tester machines.
+2. Restrict the staging app to the Tailscale interface or block public ingress at the cloud firewall.
+3. Share the Tailscale hostname or private address only with internal testers.
+4. Keep app-level Basic Auth enabled.
+5. Set the server-only `.env` value:
+
+```bash
+STAGING_ACCESS_MODE=private_network_or_tunnel
+```
+
+### Temporary Option C: Cloudflare Tunnel
+
+Use this when a public hostname is useful but direct public ingress should stay closed.
+
+1. Create a Cloudflare Tunnel for the staging host.
+2. Point the tunnel service to `http://cad-agent:3000` or the local compose port.
+3. Protect the hostname with Cloudflare Access and an internal identity policy.
+4. Close direct public ingress to the app port in the cloud firewall.
+5. Keep app-level Basic Auth enabled unless the Access policy is formally replacing it.
+6. Set the server-only `.env` value:
+
+```bash
+STAGING_ACCESS_MODE=private_network_or_tunnel
+```
+
+When HTTPS is active through Caddy or another TLS reverse proxy, set:
+
+```bash
+STAGING_ACCESS_MODE=https
+```
+
 ## Rollback
 
 To return to the HTTP-only staging compose:

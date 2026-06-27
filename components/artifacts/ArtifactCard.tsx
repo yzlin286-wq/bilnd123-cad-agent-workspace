@@ -8,7 +8,7 @@ export function ArtifactCard({ artifact }: { artifact: CADArtifact }) {
     <a className="artifact-link-card" href={artifact.url} target="_blank" rel="noreferrer">
       {iconFor(artifact.kind)}
       <span>{labelFor(artifact)}</span>
-      <small>{formatBytes(artifact.bytes)}</small>
+      <small>{descriptionFor(artifact) ?? formatBytes(artifact.bytes)}</small>
       <Download size={15} />
     </a>
   );
@@ -30,6 +30,11 @@ function labelFor(artifact: CADArtifact) {
   if (artifact.kind === "validation") return "Validation";
   if (artifact.kind === "package") return "Download package";
   return artifact.label;
+}
+
+function descriptionFor(artifact: CADArtifact) {
+  if (artifact.kind === "package") return "STEP, STL, drawing, source, spec, validation";
+  return undefined;
 }
 
 function formatBytes(bytes: number) {

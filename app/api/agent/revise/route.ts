@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { encodeSSE } from "@/lib/agent/events";
 import { runRevisionOrchestration } from "@/lib/agent/orchestrator";
-import { enforcePromptLimit, enforceRateLimit } from "@/lib/server/request-guards";
+import { enforcePromptLimit, enforceRateLimit, friendlyJSONError } from "@/lib/server/request-guards";
+import { userMessageForErrorCode } from "@/lib/server/failure-codes";
 import { appendRunHistory } from "@/lib/server/run-history";
 import type { EngineeringSpec } from "@/lib/agent/spec";
 
@@ -29,17 +30,12 @@ export async function POST(request: Request) {
     };
   } catch {
     await logRejectedRevision(guardRunId, startedAt, "INVALID_JSON");
-    return Response.json({ error: "Invalid JSON request body" }, { status: 400 });
+    return friendlyJSONError("INVALID_JSON", userMessageForErrorCode("INVALID_JSON"), 400);
   }
 
   if (!body.currentSpec || !body.currentRevisionId || !body.userPrompt?.trim()) {
     await logRejectedRevision(guardRunId, startedAt, "REVISION_REQUEST_REQUIRED", body.userPrompt);
-    return Response.json(
-      {
-        error: "currentSpec, currentRevisionId, and userPrompt are required",
-      },
-      { status: 400 },
-    );
+    return friendlyJSONError("REVISION_REQUEST_REQUIRED", userMessageForErrorCode("REVISION_REQUEST_REQUIRED"), 400);
   }
   const promptLimitResponse = enforcePromptLimit(body.userPrompt, "userPrompt");
   if (promptLimitResponse) {

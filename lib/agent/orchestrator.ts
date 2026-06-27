@@ -5,7 +5,7 @@ import { runCADKernel, CADRunnerNotConfiguredError } from "@/lib/cad/cad-runner-
 import { findArtifact } from "@/lib/cad/artifacts";
 import { mergeRevisionSpec, normalizeSpec } from "@/lib/agent/spec-merge";
 import { callSpecRevisionPlanner, callWorkstreamPlanner, repairJSONCandidate } from "@/lib/server/openai-compatible";
-import { operationalErrorCode } from "@/lib/server/failure-codes";
+import { operationalErrorCode, userMessageForErrorCode } from "@/lib/server/failure-codes";
 import { getRuntimeConfig, isLLMConfigured } from "@/lib/server/runtime";
 import { appendRunHistory, type RunHistoryRoute } from "@/lib/server/run-history";
 
@@ -84,7 +84,7 @@ export async function runAgentOrchestration(prompt: string, emit: Emit, route: R
       await emit({
         type: "error",
         code: "CAD_ENGINE_NOT_CONNECTED",
-        message: error.message,
+        message: userMessageForErrorCode("CAD_ENGINE_NOT_CONNECTED"),
         userMessage: "CAD engine not connected. Connect build123d before generating files.",
       });
       await appendRunHistory({
@@ -100,11 +100,15 @@ export async function runAgentOrchestration(prompt: string, emit: Emit, route: R
     }
 
     const errorCode = operationalErrorCode(error, "AGENT_RUN_FAILED");
+    const userMessage = userMessageForErrorCode(
+      errorCode,
+      "The CAD agent could not finish this revision. Review the prompt or engine connection and try again.",
+    );
     await emit({
       type: "error",
       code: errorCode,
-      message: error instanceof Error ? error.message : "Unknown agent failure.",
-      userMessage: userFacingRunError(error, "The CAD agent could not finish this revision. Review the prompt or engine connection and try again."),
+      message: userMessage,
+      userMessage,
     });
     await appendRunHistory({
       route,
@@ -201,7 +205,7 @@ export async function runRevisionOrchestration({
       await emit({
         type: "error",
         code: "CAD_ENGINE_NOT_CONNECTED",
-        message: error.message,
+        message: userMessageForErrorCode("CAD_ENGINE_NOT_CONNECTED"),
         userMessage: "CAD engine not connected. Connect build123d before rebuilding this revision.",
       });
       await appendRunHistory({
@@ -217,11 +221,15 @@ export async function runRevisionOrchestration({
     }
 
     const errorCode = operationalErrorCode(error, "REVISION_FAILED");
+    const userMessage = userMessageForErrorCode(
+      errorCode,
+      "The CAD agent could not revise this model. Check the instruction and try again.",
+    );
     await emit({
       type: "error",
       code: errorCode,
-      message: error instanceof Error ? error.message : "Unknown revision failure.",
-      userMessage: userFacingRunError(error, "The CAD agent could not revise this model. Check the instruction and try again."),
+      message: userMessage,
+      userMessage,
     });
     await appendRunHistory({
       route,
@@ -233,14 +241,6 @@ export async function runRevisionOrchestration({
       errorCode,
     });
   }
-}
-
-function userFacingRunError(error: unknown, fallback: string) {
-  const message = error instanceof Error ? error.message : "";
-  if (message.includes("Unsupported partType")) {
-    return message;
-  }
-  return fallback;
 }
 
 async function createEngineeringSpec(prompt: string): Promise<{ spec: EngineeringSpec; model: string }> {
@@ -287,7 +287,11 @@ function extractJSON(content: string) {
   if (!candidate.startsWith("{")) {
     throw new Error("AI model did not return JSON engineering spec.");
   }
-  return JSON.parse(candidate) as Record<string, unknown>;
+  try {
+    return JSON.parse(candidate) as Record<string, unknown>;
+  } catch {
+    throw new Error("AI model returned invalid JSON engineering spec.");
+  }
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { encodeSSE } from "@/lib/agent/events";
 import { runAgentOrchestration } from "@/lib/agent/orchestrator";
-import { enforcePromptLimit, enforceRateLimit } from "@/lib/server/request-guards";
+import { enforcePromptLimit, enforceRateLimit, friendlyJSONError } from "@/lib/server/request-guards";
+import { userMessageForErrorCode } from "@/lib/server/failure-codes";
 import { appendRunHistory } from "@/lib/server/run-history";
 
 export const runtime = "nodejs";
@@ -20,13 +21,13 @@ export async function POST(request: Request) {
     body = (await request.json()) as { prompt?: string };
   } catch {
     await logRejectedRun(guardRunId, startedAt, "INVALID_JSON");
-    return Response.json({ error: "Invalid JSON request body" }, { status: 400 });
+    return friendlyJSONError("INVALID_JSON", userMessageForErrorCode("INVALID_JSON"), 400);
   }
 
   const prompt = body.prompt?.trim();
   if (!prompt) {
     await logRejectedRun(guardRunId, startedAt, "PROMPT_REQUIRED");
-    return Response.json({ error: "Prompt is required" }, { status: 400 });
+    return friendlyJSONError("PROMPT_REQUIRED", userMessageForErrorCode("PROMPT_REQUIRED"), 400);
   }
   const promptLimitResponse = enforcePromptLimit(prompt);
   if (promptLimitResponse) {

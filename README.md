@@ -4,7 +4,7 @@ AI CAD Agent workspace built with Next.js, React, Three.js, and build123d.
 
 The product surface is intentionally user-facing: users start with natural language, then watch an agent workstream create an engineering spec, run the CAD kernel, validate geometry, and expose real artifacts for preview and download.
 
-Current stage: `v0.7 observation hardening`.
+Current stage: `v0.8 internal trial usability + reliability`.
 
 ## Product Shape
 
@@ -89,6 +89,7 @@ STAGING_BASIC_AUTH_PASSWORD=replace-with-strong-staging-password
 MAX_PROMPT_CHARS=2000
 CAD_RUNNER_TIMEOUT_MS=60000
 CAD_MAX_CONCURRENT_RUNS=1
+STAGING_ACCESS_MODE=unknown
 CAD_OUTPUT_RETENTION_HOURS=72
 CAD_OUTPUT_MAX_BYTES=1073741824
 ```
@@ -116,6 +117,7 @@ npm run runs:classify
 npm run runs:summary
 npm run failures:export
 npm run staging:report
+npm run staging:protocol
 ```
 
 CI runs `npm ci`, lint, typecheck, unit tests, production build, and Python build123d smoke tests for both `mounting_plate` and `l_bracket`. The runner smoke also checks `package.zip`.
@@ -140,6 +142,7 @@ Legacy diagnostic endpoints may remain for development, but the user-facing app 
 
 - Deployment guide: `docs/STAGING_DEPLOYMENT.md`
 - HTTPS guide: `docs/HTTPS_STAGING.md`
+- Access control guide: `docs/ACCESS_CONTROL.md`
 - Failure triage guide: `docs/FAILURE_TRIAGE.md`
 - Operations guide: `docs/OPERATIONS.md`
 - 48-72 hour test protocol: `docs/STAGING_TEST_PROTOCOL.md`
@@ -155,3 +158,6 @@ Observation tools:
 - `npm run runs:classify`: split failures into expected and unexpected categories
 - `npm run failures:export`: write a sanitized failure corpus for triage
 - `npm run staging:report`: generate a local sanitized report at `outputs/reports/staging-report.md`
+- `npm run staging:protocol`: dry-run the 20-prompt internal trial protocol at `outputs/protocol/latest.json`
+
+`npm run staging:protocol -- --execute` calls the real staging service and can incur model/API cost. Use it only when the staging access path and Basic Auth are configured.

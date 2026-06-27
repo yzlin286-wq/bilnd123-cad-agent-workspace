@@ -12,14 +12,24 @@ export function FileList({ artifacts }: { artifacts: CADArtifact[] }) {
     <div className="file-list">
       {artifacts.map((artifact) => (
         <a href={artifact.url} target="_blank" rel="noreferrer" key={artifact.id}>
-          <span>{artifact.name}</span>
-          <small>{artifact.label}</small>
+          <span>{labelFor(artifact)}</span>
+          <small>{descriptionFor(artifact)}</small>
           <strong>{formatBytes(artifact.bytes)}</strong>
           <Download size={15} />
         </a>
       ))}
     </div>
   );
+}
+
+function labelFor(artifact: CADArtifact) {
+  if (artifact.kind === "package") return "Download package";
+  return artifact.name;
+}
+
+function descriptionFor(artifact: CADArtifact) {
+  if (artifact.kind === "package") return "STEP, STL, drawing, source, spec, validation";
+  return artifact.label;
 }
 
 function formatBytes(bytes: number) {

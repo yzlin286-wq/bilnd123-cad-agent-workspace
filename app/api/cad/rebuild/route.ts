@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { runCADKernel, CADRunnerNotConfiguredError } from "@/lib/cad/cad-runner-client";
-import { enforcePromptLimit, enforceRateLimit } from "@/lib/server/request-guards";
-import { operationalErrorCode } from "@/lib/server/failure-codes";
+import { enforcePromptLimit, enforceRateLimit, friendlyJSONError } from "@/lib/server/request-guards";
+import { operationalErrorCode, userMessageForErrorCode } from "@/lib/server/failure-codes";
 import { appendRunHistory } from "@/lib/server/run-history";
 import type { EngineeringSpec } from "@/lib/agent/spec";
 
@@ -21,12 +21,12 @@ export async function POST(request: Request) {
     body = (await request.json()) as { spec?: EngineeringSpec; prompt?: string };
   } catch {
     await logRejectedRebuild(runId, startedAt, "INVALID_JSON");
-    return Response.json({ error: "Invalid JSON request body" }, { status: 400 });
+    return friendlyJSONError("INVALID_JSON", userMessageForErrorCode("INVALID_JSON"), 400);
   }
 
   if (!body.spec) {
     await logRejectedRebuild(runId, startedAt, "SPEC_REQUIRED", body.prompt);
-    return Response.json({ error: "spec is required" }, { status: 400 });
+    return friendlyJSONError("SPEC_REQUIRED", userMessageForErrorCode("SPEC_REQUIRED"), 400);
   }
   const promptLimitResponse = enforcePromptLimit(body.prompt, "prompt");
   if (promptLimitResponse) {
@@ -75,8 +75,7 @@ export async function POST(request: Request) {
     return Response.json(
       {
         error: errorCode,
-        userMessage: userFacingCADRebuildError(error),
-        detail: error instanceof Error ? error.message : "Unknown error.",
+        userMessage: userMessageForErrorCode(errorCode, "The CAD engine could not rebuild this revision."),
       },
       { status: 500 },
     );
@@ -92,12 +91,4 @@ function logRejectedRebuild(runId: string, startedAt: number, errorCode: string,
     durationMs: performance.now() - startedAt,
     errorCode,
   });
-}
-
-function userFacingCADRebuildError(error: unknown) {
-  const message = error instanceof Error ? error.message : "";
-  if (message.includes("Unsupported partType")) {
-    return message;
-  }
-  return "The CAD engine could not rebuild this revision.";
 }

@@ -6,12 +6,14 @@ import { isCADRunnerConfigured, isLLMConfigured } from "@/lib/server/runtime";
 export const runtime = "nodejs";
 
 const supportedTemplates = ["mounting_plate", "l_bracket"];
+const accessModes = new Set(["https", "private_network_or_tunnel", "http_restricted", "unknown"]);
 
 export async function GET() {
   const outputDirWritable = await canWriteOutputDir();
   const cadRunnerConfigured = isCADRunnerConfigured();
   const llmConfigured = isLLMConfigured();
   const httpsConfigured = Boolean(process.env.STAGING_DOMAIN?.trim());
+  const accessMode = stagingAccessMode();
   const warning =
     process.env.NODE_ENV === "production" && !httpsConfigured
       ? "Staging is running without HTTPS domain; restrict access."
@@ -24,9 +26,18 @@ export async function GET() {
     llmConfigured,
     outputDirWritable,
     httpsConfigured,
+    accessMode,
     warning,
     supportedTemplates,
   });
+}
+
+function stagingAccessMode() {
+  const configured = process.env.STAGING_ACCESS_MODE?.trim();
+  if (configured && accessModes.has(configured)) {
+    return configured;
+  }
+  return "unknown";
 }
 
 async function canWriteOutputDir() {

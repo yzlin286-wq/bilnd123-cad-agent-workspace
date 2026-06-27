@@ -65,12 +65,14 @@ for (const kind of ["step", "stl", "validation", "package"]) {
 
 const result = {
   ok: true,
+  generatedAt: new Date().toISOString(),
   durationMs: Date.now() - startedAt,
   health: {
     cadRunnerConfigured: health.cadRunnerConfigured,
     llmConfigured: health.llmConfigured,
     outputDirWritable: health.outputDirWritable,
     httpsConfigured: health.httpsConfigured,
+    accessMode: health.accessMode,
     warning: health.warning,
   },
   rev001: revisionSummary(rev001),
