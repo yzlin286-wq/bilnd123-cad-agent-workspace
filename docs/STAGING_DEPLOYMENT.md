@@ -30,6 +30,7 @@ CAD_AGENT_DOWNGRADE_MODEL=secondary-real-model
 CAD_RUNNER_COMMAND=/app/.venv/bin/python scripts/run_build123d.py
 CAD_RUNNER_TIMEOUT_MS=60000
 CAD_MAX_CONCURRENT_RUNS=1
+PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
 
 STAGING_BASIC_AUTH_USER=replace-with-staging-user
 STAGING_BASIC_AUTH_PASSWORD=replace-with-strong-staging-password
