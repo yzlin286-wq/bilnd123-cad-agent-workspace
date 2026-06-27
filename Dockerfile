@@ -1,7 +1,10 @@
 FROM node:24.13.0-bookworm AS deps
+ARG APT_MIRROR=http://deb.debian.org/debian
+ARG APT_SECURITY_MIRROR=http://deb.debian.org/debian-security
 ARG PIP_INDEX_URL=https://pypi.org/simple
 
 WORKDIR /app
+RUN sed -i "s|http://deb.debian.org/debian-security|${APT_SECURITY_MIRROR}|g; s|http://deb.debian.org/debian|${APT_MIRROR}|g" /etc/apt/sources.list.d/debian.sources
 RUN apt-get update \
   && apt-get install -y --no-install-recommends python3 python3-venv python3-pip \
   && rm -rf /var/lib/apt/lists/*
