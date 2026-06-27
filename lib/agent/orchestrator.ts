@@ -253,6 +253,7 @@ async function createEngineeringSpec(prompt: string): Promise<{ spec: Engineerin
   if (!isRecord(raw)) {
     throw new Error("AI model returned an invalid engineering spec.");
   }
+  rejectUnsupportedPartType(raw);
   return { spec: normalizeSpec(raw), model: result.model };
 }
 
@@ -296,6 +297,13 @@ function extractJSON(content: string) {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function rejectUnsupportedPartType(raw: Record<string, unknown>) {
+  const partType = String(raw.partType ?? raw.part_type ?? "mounting_plate");
+  if (partType !== "mounting_plate" && partType !== "l_bracket") {
+    throw new Error(`Unsupported partType '${partType}'. Supported partType values: mounting_plate, l_bracket.`);
+  }
 }
 
 function emitStep(
