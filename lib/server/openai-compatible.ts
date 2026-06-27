@@ -41,7 +41,7 @@ const ENGINEERING_SPEC_SCHEMA: JSONSchema = {
           edgeOffset: { type: "number" },
           chamfer: { type: "number" },
           material: { type: "string" },
-          partType: { type: "string", enum: ["mounting_plate", "l_bracket"] },
+          partType: { type: "string" },
           units: { type: "string" },
         },
         required: ["partType", "length", "width", "thickness", "holeDiameter", "edgeOffset", "chamfer", "material", "units"],
@@ -69,7 +69,7 @@ const SPEC_REVISION_SCHEMA: JSONSchema = {
           edgeOffset: { type: "number" },
           chamfer: { type: "number" },
           material: { type: "string" },
-          partType: { type: "string", enum: ["mounting_plate", "l_bracket"] },
+          partType: { type: "string" },
           units: { type: "string" },
         },
       },
@@ -85,7 +85,7 @@ const SPEC_REVISION_SCHEMA: JSONSchema = {
           edgeOffset: { type: "number" },
           chamfer: { type: "number" },
           material: { type: "string" },
-          partType: { type: "string", enum: ["mounting_plate", "l_bracket"] },
+          partType: { type: "string" },
           units: { type: "string" },
         },
         required: ["partType", "length", "width", "thickness", "holeDiameter", "edgeOffset", "chamfer", "material", "units"],
@@ -118,7 +118,7 @@ export async function callWorkstreamPlanner({
         model,
         config,
         systemPrompt:
-          "You are a CAD agent planner. Return only JSON with an engineeringSpec object. Supported partType values are mounting_plate and l_bracket. Required engineeringSpec fields: partType, length, width, thickness, holeDiameter, edgeOffset, chamfer, material, units. For l_bracket also include height. Use millimeters unless the user explicitly asks otherwise. Do not generate fallback CAD code.",
+          "You are a CAD agent planner. Return only JSON with an engineeringSpec object. The CAD runner currently supports only mounting_plate and l_bracket. If the user asks for any other object, set engineeringSpec.partType to that unsupported object type, such as gear, enclosure, or hinge, so the app can reject it; do not approximate unsupported requests as mounting_plate or l_bracket. Required engineeringSpec fields: partType, length, width, thickness, holeDiameter, edgeOffset, chamfer, material, units. For l_bracket also include height. Use millimeters unless the user explicitly asks otherwise. Do not generate fallback CAD code.",
         jsonSchema: ENGINEERING_SPEC_SCHEMA,
       });
       if (!content.trim()) {
@@ -171,7 +171,7 @@ export async function callSpecRevisionPlanner({
         model,
         config,
         systemPrompt:
-          "You revise an existing build123d engineering spec for supported partType values mounting_plate and l_bracket. Return JSON only. Prefer a specDelta containing only changed fields. Preserve unchanged partType, dimensions, holeDiameter, edgeOffset, chamfer, material, and units. Never reinterpret a revision instruction as a new part request.",
+          "You revise an existing build123d engineering spec. The CAD runner currently supports only mounting_plate and l_bracket; if a revision asks to convert the model to another object type, set partType to that unsupported object type so the app can reject it. Return JSON only. Prefer a specDelta containing only changed fields. Preserve unchanged partType, dimensions, holeDiameter, edgeOffset, chamfer, material, and units. Never reinterpret a revision instruction as a new part request.",
         jsonSchema: SPEC_REVISION_SCHEMA,
       });
       if (!content.trim()) {

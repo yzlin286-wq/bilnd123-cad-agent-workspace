@@ -20,6 +20,7 @@ const REVISION_CASES = {
     seed: "mounting_plate",
     preserved: ["length", "width", "thickness", "holeDiameter", "edgeOffset"],
     changed: { chamfer: 2 },
+    seedPrompt: "Make a 120 x 80 x 6 mm mounting plate with four 4.5 mm holes, 10 mm edge offset, and 1 mm chamfer.",
   },
   13: {
     seed: "l_bracket",
@@ -227,7 +228,7 @@ async function executeRevisionCase(item, baseUrl) {
     return failedEvaluation("unexpected_failure", "protocol_error", "REVISION_CASE_NOT_CONFIGURED", "Revision protocol case is not configured.", []);
   }
 
-  const seed = await postSSE(baseUrl, "/api/agent/run", { prompt: seedPromptFor(revisionCase.seed) });
+  const seed = await postSSE(baseUrl, "/api/agent/run", { prompt: revisionCase.seedPrompt || seedPromptFor(revisionCase.seed) });
   if (seed.error || !seed.revision) {
     return failedEvaluation("unexpected_failure", "seed_failed", seed.error?.code || "SEED_REVISION_FAILED", seed.error?.userMessage, [
       check("seed revision generated", true, false),
