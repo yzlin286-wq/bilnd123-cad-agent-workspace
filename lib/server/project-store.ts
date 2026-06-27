@@ -2,9 +2,10 @@ import { randomUUID } from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import type { CADRevision } from "@/lib/agent/spec";
+import type { AuthContext } from "@/lib/server/auth";
 import type { RunHistoryRoute } from "@/lib/server/run-history";
 import { sanitizeStoredText, titleFromPrompt } from "@/lib/server/sanitize";
-import type { StoredMessage, StoredProject, StoredProjectSummary, StoredRevision } from "@/lib/project/types";
+import type { ArtifactOwnership, StoredMessage, StoredProject, StoredProjectSummary, StoredRevision } from "@/lib/project/types";
 
 export const PROJECT_STORE_PATH = path.resolve(process.cwd(), "logs", "projects.json");
 
@@ -17,13 +18,16 @@ let writeQueue = Promise.resolve();
 
 export async function listProjects({
   limit = 10,
+  auth,
   storePath = PROJECT_STORE_PATH,
 }: {
   limit?: number;
+  auth?: AuthContext;
   storePath?: string;
 } = {}) {
   const store = await readStore(storePath);
   return [...store.projects]
+    .filter((project) => canReadStoredProject(auth, project))
     .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))
     .slice(0, limit)
     .map(projectSummary);
@@ -34,17 +38,27 @@ export async function getProject(projectId: string, storePath = PROJECT_STORE_PA
   return store.projects.find((project) => project.id === projectId);
 }
 
+export async function getProjectForAuth(projectId: string, auth: AuthContext, storePath = PROJECT_STORE_PATH) {
+  const project = await getProject(projectId, storePath);
+  if (!project || !canReadStoredProject(auth, project)) return undefined;
+  return project;
+}
+
 export async function createProject({
   prompt,
+  auth,
   storePath = PROJECT_STORE_PATH,
 }: {
   prompt: string;
+  auth: AuthContext;
   storePath?: string;
 }) {
   return mutateStore(storePath, (store) => {
     const now = new Date().toISOString();
     const project: StoredProject = {
       id: randomUUID(),
+      ownerUserId: auth.userId || "unknown-user",
+      organizationId: auth.organizationId,
       title: titleFromPrompt(prompt),
       createdAt: now,
       updatedAt: now,
@@ -147,6 +161,8 @@ export function projectSummary(project: StoredProject): StoredProjectSummary {
   const latestRevision = project.revisions.find((revision) => revision.id === project.latestRevisionId) ?? project.revisions.at(-1);
   return {
     id: project.id,
+    ownerUserId: project.ownerUserId,
+    organizationId: project.organizationId,
     title: project.title,
     createdAt: project.createdAt,
     updatedAt: project.updatedAt,
@@ -155,6 +171,59 @@ export function projectSummary(project: StoredProject): StoredProjectSummary {
     messageCount: project.messages.length,
     partType: latestRevision?.engineeringSpec.partType,
   };
+}
+
+export async function findArtifactOwnership(artifactId: string, storePath = PROJECT_STORE_PATH): Promise<ArtifactOwnership | undefined> {
+  const store = await readStore(storePath);
+  for (const project of store.projects) {
+    for (const revision of project.revisions) {
+      const artifact = revision.artifacts.find((item) => item.id === artifactId);
+      if (artifact) {
+        return {
+          artifactId,
+          projectId: project.id,
+          revisionId: revision.id,
+          ownerUserId: project.ownerUserId,
+          organizationId: project.organizationId,
+          artifactKind: artifact.kind,
+        };
+      }
+    }
+  }
+  return undefined;
+}
+
+export async function findProjectByRevisionId(revisionId: string, storePath = PROJECT_STORE_PATH) {
+  const store = await readStore(storePath);
+  return store.projects.find((project) => project.revisions.some((revision) => revision.id === revisionId));
+}
+
+export async function recentArtifacts({
+  auth,
+  limit = 8,
+  storePath = PROJECT_STORE_PATH,
+}: {
+  auth?: AuthContext;
+  limit?: number;
+  storePath?: string;
+} = {}) {
+  const store = await readStore(storePath);
+  return store.projects
+    .filter((project) => canReadStoredProject(auth, project))
+    .flatMap((project) =>
+      project.revisions.flatMap((revision) =>
+        revision.artifacts.map((artifact) => ({
+          ...artifact,
+          projectId: project.id,
+          projectTitle: project.title,
+          revisionId: revision.id,
+          createdAt: revision.createdAt,
+          partType: revision.engineeringSpec.partType,
+        })),
+      ),
+    )
+    .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))
+    .slice(0, limit);
 }
 
 async function mutateProject<T>(projectId: string, storePath: string, mutator: (project: StoredProject) => T) {
@@ -183,11 +252,22 @@ async function readStore(storePath: string): Promise<ProjectStoreFile> {
   try {
     const text = await fs.readFile(storePath, "utf8");
     const parsed = JSON.parse(text) as ProjectStoreFile;
-    if (parsed.version === 1 && Array.isArray(parsed.projects)) return parsed;
+    if (parsed.version === 1 && Array.isArray(parsed.projects)) return migrateStore(parsed);
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
   }
   return { version: 1, projects: [] };
+}
+
+function migrateStore(store: ProjectStoreFile): ProjectStoreFile {
+  return {
+    version: 1,
+    projects: store.projects.map((project) => ({
+      ...project,
+      ownerUserId: project.ownerUserId || process.env.SAAS_DEV_USER_ID || "internal-staging-user",
+      organizationId: project.organizationId || process.env.SAAS_DEV_ORG_ID || "internal-staging",
+    })),
+  };
 }
 
 async function writeStore(storePath: string, store: ProjectStoreFile) {
@@ -207,4 +287,12 @@ function toStoredRevision(revision: CADRevision): StoredRevision {
 
 function formatRevision(index: number) {
   return `Rev ${String(index).padStart(3, "0")}`;
+}
+
+function canReadStoredProject(auth: AuthContext | undefined, project: StoredProject) {
+  if (!auth) return true;
+  if (auth.isAdmin) return true;
+  if (auth.userId && project.ownerUserId === auth.userId) return true;
+  if (auth.organizationId && project.organizationId === auth.organizationId) return true;
+  return false;
 }

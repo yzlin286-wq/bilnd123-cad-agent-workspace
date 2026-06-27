@@ -9,8 +9,8 @@ const examples = [
   "Create an 80 x 60 x 40 mm L bracket, 5 mm thick, with 5 mm mounting holes",
 ];
 
-export function HeroComposer({ onGenerate }: { onGenerate: (prompt: string) => void }) {
-  const [prompt, setPrompt] = useState(examples[0]);
+export function HeroComposer({ initialPrompt, onGenerate }: { initialPrompt?: string; onGenerate: (prompt: string) => void }) {
+  const [prompt, setPrompt] = useState(initialPrompt || examples[0]);
 
   return (
     <main className="landing">

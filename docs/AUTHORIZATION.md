@@ -1,0 +1,45 @@
+# Authorization
+
+## Route Protection
+
+- `/app/*`: requires a signed-in Clerk user when Clerk is configured.
+- `/admin`: requires a signed-in Clerk user and admin status.
+- Staging may also use Basic Auth as an outer access gate.
+
+Admin status can come from:
+
+- Clerk organization role: `admin`, `org:admin`, or `owner`
+- `SAAS_ADMIN_USER_IDS`
+- `SAAS_ADMIN_EMAILS`
+- Temporary staging Basic Auth fallback user
+
+## Project Ownership
+
+Every project must have at least one ownership boundary:
+
+- `owner_user_id`
+- `organization_id`
+
+Users can access a project only when they are:
+
+- The project owner
+- A member of the owning organization
+- An admin
+
+## Artifact Authorization
+
+`GET /api/artifacts/[id]` must:
+
+1. Require auth.
+2. Resolve artifact ownership from project/revision metadata.
+3. Verify the current user can access the project.
+4. Return `401` for unauthenticated requests.
+5. Return `403` for authenticated users outside the project/org.
+6. Resolve the artifact path only after authorization.
+7. Preserve path traversal protection under `outputs/cad`.
+
+The route must never expose local server paths.
+
+## Current Caveat
+
+When Clerk and Postgres are not configured, staging uses Basic Auth plus the JSON fallback store. This is a bridge for controlled internal testing, not a complete production SaaS authorization model.

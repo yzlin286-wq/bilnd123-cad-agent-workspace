@@ -10,8 +10,13 @@ import { getRuntimeConfig, isLLMConfigured } from "@/lib/server/runtime";
 import { appendRunHistory, type RunHistoryRoute } from "@/lib/server/run-history";
 
 type Emit = (event: AgentEvent) => void | Promise<void>;
+type RunContext = {
+  userId?: string;
+  organizationId?: string;
+  projectId?: string;
+};
 
-export async function runAgentOrchestration(prompt: string, emit: Emit, route: RunHistoryRoute = "/api/agent/run") {
+export async function runAgentOrchestration(prompt: string, emit: Emit, route: RunHistoryRoute = "/api/agent/run", context: RunContext = {}) {
   const runId = randomUUID();
   const startedAt = performance.now();
   let model: string | undefined;
@@ -33,6 +38,7 @@ export async function runAgentOrchestration(prompt: string, emit: Emit, route: R
       status: "failure",
       durationMs: performance.now() - startedAt,
       errorCode: "AI_ENGINE_NOT_CONNECTED",
+      ...context,
     });
     return;
   }
@@ -77,6 +83,7 @@ export async function runAgentOrchestration(prompt: string, emit: Emit, route: R
       status: "success",
       durationMs: performance.now() - startedAt,
       revision,
+      ...context,
     });
   } catch (error) {
     if (error instanceof CADRunnerNotConfiguredError) {
@@ -95,6 +102,7 @@ export async function runAgentOrchestration(prompt: string, emit: Emit, route: R
         status: "failure",
         durationMs: performance.now() - startedAt,
         errorCode: "CAD_ENGINE_NOT_CONNECTED",
+        ...context,
       });
       return;
     }
@@ -118,6 +126,7 @@ export async function runAgentOrchestration(prompt: string, emit: Emit, route: R
       status: "failure",
       durationMs: performance.now() - startedAt,
       errorCode,
+      ...context,
     });
   }
 }
@@ -128,12 +137,14 @@ export async function runRevisionOrchestration({
   userPrompt,
   emit,
   route = "/api/agent/revise",
+  context = {},
 }: {
   currentSpec: EngineeringSpec;
   currentRevisionId: string;
   userPrompt: string;
   emit: Emit;
   route?: RunHistoryRoute;
+  context?: RunContext;
 }) {
   const runId = randomUUID();
   const startedAt = performance.now();
@@ -156,6 +167,7 @@ export async function runRevisionOrchestration({
       status: "failure",
       durationMs: performance.now() - startedAt,
       errorCode: "AI_ENGINE_NOT_CONNECTED",
+      ...context,
     });
     return;
   }
@@ -198,6 +210,7 @@ export async function runRevisionOrchestration({
       status: "success",
       durationMs: performance.now() - startedAt,
       revision,
+      ...context,
     });
   } catch (error) {
     if (error instanceof CADRunnerNotConfiguredError) {
@@ -216,6 +229,7 @@ export async function runRevisionOrchestration({
         status: "failure",
         durationMs: performance.now() - startedAt,
         errorCode: "CAD_ENGINE_NOT_CONNECTED",
+        ...context,
       });
       return;
     }
@@ -239,6 +253,7 @@ export async function runRevisionOrchestration({
       status: "failure",
       durationMs: performance.now() - startedAt,
       errorCode,
+      ...context,
     });
   }
 }

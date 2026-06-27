@@ -4,6 +4,7 @@ import { runRevisionOrchestration } from "@/lib/agent/orchestrator";
 import { enforcePromptLimit, enforceRateLimit, friendlyJSONError } from "@/lib/server/request-guards";
 import { userMessageForErrorCode } from "@/lib/server/failure-codes";
 import { appendRunHistory } from "@/lib/server/run-history";
+import { canAccessProject, forbiddenResponse, requireRequestAuth } from "@/lib/server/auth";
 import {
   appendProjectError,
   appendProjectMessage,
@@ -18,6 +19,12 @@ export const runtime = "nodejs";
 export async function POST(request: Request) {
   const guardRunId = randomUUID();
   const startedAt = performance.now();
+  const authResult = await requireRequestAuth(request);
+  if (authResult.response) {
+    await logRejectedRevision(guardRunId, startedAt, "AUTH_REQUIRED");
+    return authResult.response;
+  }
+  const auth = authResult.auth;
   const rateLimitResponse = enforceRateLimit(request);
   if (rateLimitResponse) {
     await logRejectedRevision(guardRunId, startedAt, "RATE_LIMITED");
@@ -52,6 +59,10 @@ export async function POST(request: Request) {
     return promptLimitResponse;
   }
   const project = body.projectId ? await getProject(body.projectId) : undefined;
+  if (project && !canAccessProject(auth, project)) {
+    await logRejectedRevision(guardRunId, startedAt, "FORBIDDEN", body.userPrompt);
+    return forbiddenResponse();
+  }
   if (project) {
     await appendProjectMessage({
       projectId: project.id,
@@ -93,6 +104,11 @@ export async function POST(request: Request) {
           userPrompt: body.userPrompt as string,
           emit,
           route: "/api/agent/revise",
+          context: {
+            userId: auth.userId,
+            organizationId: auth.organizationId,
+            projectId: project?.id,
+          },
         });
       } finally {
         controller.close();

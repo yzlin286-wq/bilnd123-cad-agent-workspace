@@ -8,5 +8,7 @@ test("staging Basic Auth proxy matcher covers artifact downloads", () => {
 
   assert.equal(pattern.test("/api/artifacts/package-id"), true);
   assert.equal(pattern.test("/api/health"), true);
+  assert.equal(pattern.test("/app/projects"), true);
+  assert.equal(pattern.test("/admin"), true);
   assert.equal(pattern.test("/_next/static/chunk.js"), false);
 });

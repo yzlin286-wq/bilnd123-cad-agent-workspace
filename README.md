@@ -4,7 +4,7 @@ AI CAD Agent workspace built with Next.js, React, Three.js, and build123d.
 
 The product surface is intentionally user-facing: users start with natural language, then watch an agent workstream create an engineering spec, run the CAD kernel, validate geometry, and expose real artifacts for preview and download.
 
-Current stage: `v1.0-alpha internal alpha readiness`.
+Current stage: `v1.1 SaaS foundation + product UI polish`.
 
 ## Product Shape
 
@@ -18,6 +18,8 @@ Current stage: `v1.0-alpha internal alpha readiness`.
 - Recent projects, messages, revisions, and artifact metadata persist locally for alpha trials
 - Trial feedback captures thumbs up/down and optional comments without user accounts
 - `/admin` provides a Basic Auth-protected alpha usage dashboard
+- `/app` provides a protected SaaS dashboard with template cards, recent projects, recent artifacts, usage, and alpha health
+- Clerk is the preferred SaaS auth provider; the JSON project store remains a dev fallback until Postgres is provisioned
 
 Not currently supported:
 
@@ -27,6 +29,12 @@ Not currently supported:
 - Complex production drawings
 - Public anonymous production traffic
 - Payment, tenancy, BOM, or RFQ flows
+
+SaaS foundation status:
+
+- Auth: Clerk scaffold is implemented, with staging Basic Auth fallback when Clerk keys are not configured.
+- Data: `db/schema.sql` defines the target Postgres schema; `logs/projects.json` remains the local/staging fallback until `DATABASE_URL` and an adapter are provisioned.
+- Authorization: artifacts are checked against project/revision ownership before download.
 
 ## No Fallback Policy
 
@@ -93,6 +101,11 @@ MAX_PROMPT_CHARS=2000
 CAD_RUNNER_TIMEOUT_MS=60000
 CAD_MAX_CONCURRENT_RUNS=1
 STAGING_ACCESS_MODE=unknown
+CLERK_SECRET_KEY=
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=
+DATABASE_URL=
+SAAS_ADMIN_USER_IDS=
+SAAS_ADMIN_EMAILS=
 CAD_OUTPUT_RETENTION_HOURS=72
 CAD_OUTPUT_MAX_BYTES=1073741824
 ```
@@ -121,6 +134,7 @@ npm run runs:summary
 npm run failures:export
 npm run staging:report
 npm run staging:protocol
+npm run release:check
 ```
 
 CI runs `npm ci`, lint, typecheck, unit tests, production build, and Python build123d smoke tests for both `mounting_plate` and `l_bracket`. The runner smoke also checks `package.zip`.
@@ -135,6 +149,8 @@ http://127.0.0.1:3000
 
 - `GET /api/health`: safe health summary for staging
 - `GET /admin`: Basic Auth-protected alpha usage dashboard
+- `GET /app`: signed-in SaaS dashboard
+- `GET /app/projects`: signed-in recent projects list
 - `GET /api/projects`: recent saved project summaries
 - `GET /api/projects/[id]`: saved project, messages, revisions, and artifact metadata
 - `POST /api/agent/run`: SSE agent orchestration endpoint
@@ -150,6 +166,10 @@ Legacy diagnostic endpoints may remain for development, but the user-facing app 
 - Deployment guide: `docs/STAGING_DEPLOYMENT.md`
 - HTTPS guide: `docs/HTTPS_STAGING.md`
 - Access control guide: `docs/ACCESS_CONTROL.md`
+- SaaS architecture: `docs/SAAS_ARCHITECTURE.md`
+- Authorization guide: `docs/AUTHORIZATION.md`
+- Data model: `docs/DATA_MODEL.md`
+- UI product spec: `docs/UI_PRODUCT_SPEC.md`
 - Failure triage guide: `docs/FAILURE_TRIAGE.md`
 - Operations guide: `docs/OPERATIONS.md`
 - 48-72 hour test protocol: `docs/STAGING_TEST_PROTOCOL.md`
@@ -167,7 +187,7 @@ Observation tools:
 - `npm run staging:report`: generate a local sanitized report at `outputs/reports/staging-report.md`
 - `npm run staging:protocol`: dry-run the 20-prompt internal trial protocol at `outputs/protocol/latest.json`
 
-`npm run staging:protocol -- --execute --output outputs/protocol/latest.json` calls the real staging service and can incur model/API cost. Use it only when the staging access path and Basic Auth are configured. The v1.0-alpha controlled trial path expects `STAGING_ACCESS_MODE=http_restricted` after the staging port is restricted by an IP allowlist, unless the deployment is upgraded to `private_network_or_tunnel` or `https`.
+`npm run staging:protocol -- --execute --output outputs/protocol/latest.json` calls the real staging service and can incur model/API cost. Use it only when the staging access path and Basic Auth are configured. The v1.1 controlled trial path expects `STAGING_ACCESS_MODE=http_restricted` after the staging port is restricted by an IP allowlist, unless the deployment is upgraded to `private_network_or_tunnel` or `https`.
 
 Alpha persistence and feedback files live in the staging log volume:
 

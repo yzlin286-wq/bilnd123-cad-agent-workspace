@@ -21,6 +21,9 @@ STAGING_ACCESS_MODE=http_restricted
 - App-level Basic Auth must stay enabled for staging.
 - `/api/artifacts/[id]` is protected by the same Basic Auth proxy as `/api/health`, `/api/agent/run`, `/api/agent/revise`, and `/api/cad/rebuild`.
 - `/admin`, `/api/projects`, and `/api/feedback` are protected by the same Basic Auth proxy.
+- When Clerk keys are configured, `/app/*` and `/admin` also require Clerk auth.
+- `/admin` requires admin allowlist or organization admin status after sign-in.
+- Artifact downloads check project/revision ownership after auth; Basic Auth alone is not the artifact authorization model.
 - Plain HTTP plus Basic Auth is acceptable only for a short operator smoke on a restricted network path.
 - Before a 48-72 hour internal trial, use HTTPS, a private network, an authenticated tunnel, or a cloud firewall allowlist.
 - `/api/health` returns a safe `accessMode` field. It must not expose hostnames, server IPs, secrets, filesystem paths, or model endpoints.

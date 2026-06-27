@@ -9,6 +9,7 @@
     "failures:export": "node scripts/export-failures.mjs",
     "start": "next start",
     "lint": "eslint .",
+    "release:check": "node scripts/release-check.mjs",
     "runs:classify": "node scripts/classify-runs.mjs",
     "runs:summary": "node scripts/summarize-runs.mjs",
     "smoke:staging": "node scripts/staging-smoke.mjs",
@@ -18,6 +19,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@clerk/nextjs": "^7.5.9",
     "@monaco-editor/react": "^4.7.0",
     "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.6.1",

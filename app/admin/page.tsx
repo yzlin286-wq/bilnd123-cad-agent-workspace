@@ -1,9 +1,17 @@
 import { getAdminSummary } from "@/lib/server/admin-summary";
+import { getPageAuthContext, isAdminUser } from "@/lib/server/auth";
 import type { ReactNode } from "react";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminPage() {
+  const auth = await getPageAuthContext();
+  if (!auth.isAuthenticated) {
+    return <AccessPanel title="Sign in required" message="Use the configured SaaS sign-in flow before opening the admin dashboard." />;
+  }
+  if (!isAdminUser(auth)) {
+    return <AccessPanel title="Admin access required" message="This dashboard is limited to configured admin users or organization admins." />;
+  }
   const summary = await getAdminSummary();
 
   return (
@@ -17,8 +25,13 @@ export default async function AdminPage() {
       </header>
 
       <section className="admin-grid">
+        <MetricCard label="Total users" value={summary.totalUsers} />
+        <MetricCard label="Total projects" value={summary.totalProjects} />
         <MetricCard label="Total runs" value={summary.totalRuns} />
         <MetricCard label="Success / failure" value={`${summary.successCount} / ${summary.failureCount}`} />
+      </section>
+
+      <section className="admin-grid">
         <MetricCard label="P95 duration" value={`${summary.p95DurationMs} ms`} />
         <MetricCard label="New unexpected failures" value={summary.newUnexpectedFailures} tone={summary.newUnexpectedFailures ? "warn" : "ok"} />
       </section>
@@ -64,6 +77,26 @@ export default async function AdminPage() {
             </li>
           </ul>
         </AdminPanel>
+        <AdminPanel title="Data layer">
+          <ul>
+            <li>Mode: {summary.dataLayer.mode}</li>
+            <li>Project store: {summary.dataLayer.projectStore}</li>
+            <li>Migration: {summary.dataLayer.migrationPath}</li>
+            <li>Production ready: {String(summary.dataLayer.productionReady)}</li>
+          </ul>
+        </AdminPanel>
+      </section>
+    </main>
+  );
+}
+
+function AccessPanel({ title, message }: { title: string; message: string }) {
+  return (
+    <main className="admin-shell">
+      <section className="access-panel">
+        <p className="microcopy">Protected admin</p>
+        <h1>{title}</h1>
+        <p>{message}</p>
       </section>
     </main>
   );

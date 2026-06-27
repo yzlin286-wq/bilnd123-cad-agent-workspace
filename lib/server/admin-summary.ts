@@ -1,6 +1,8 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { summarizeFeedback } from "@/lib/server/feedback";
+import { listProjects } from "@/lib/server/project-store";
+import { getDataLayerStatus } from "@/lib/server/data-layer";
 
 const RUN_LOG_PATH = path.resolve(process.cwd(), "logs", "runs.jsonl");
 const SMOKE_PATH = path.resolve(process.cwd(), "outputs", "smoke", "latest.json");
@@ -39,11 +41,12 @@ type RunRecord = {
 type JSONRecord = Record<string, unknown>;
 
 export async function getAdminSummary() {
-  const [runs, smoke, protocol, feedback] = await Promise.all([
+  const [runs, smoke, protocol, feedback, projects] = await Promise.all([
     readJSONL<RunRecord>(RUN_LOG_PATH),
     readJSONIfExists(SMOKE_PATH),
     readJSONIfExists(PROTOCOL_PATH),
     summarizeFeedback(),
+    listProjects({ limit: 10_000 }),
   ]);
   const durations = runs.map((run) => Number(run.durationMs)).filter((duration) => Number.isFinite(duration));
   const failures = runs.filter((run) => run.status === "failure" || run.validationPassed === false);
@@ -54,6 +57,8 @@ export async function getAdminSummary() {
 
   return {
     generatedAt: new Date().toISOString(),
+    totalUsers: new Set(projects.map((project) => project.ownerUserId).filter(Boolean)).size,
+    totalProjects: projects.length,
     totalRuns: runs.length,
     successCount: runs.filter((run) => run.status === "success").length,
     failureCount: failures.length,
@@ -79,6 +84,7 @@ export async function getAdminSummary() {
       : undefined,
     newUnexpectedFailures,
     feedback,
+    dataLayer: getDataLayerStatus(),
   };
 }
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Download } from "lucide-react";
 import { FileList } from "@/components/artifacts/FileList";
 import { ParameterControls } from "@/components/cad/ParameterControls";
 import { RealModelViewer } from "@/components/cad/RealModelViewer";
@@ -57,7 +58,7 @@ export function CADArtifactCanvas({
       </div>
       {revision ? <FeedbackPanel key={revision.id} onFeedback={onFeedback} /> : null}
       <div className="canvas-body">
-        {tab === "preview" ? <RealModelViewer artifact={preview} loading={running} /> : null}
+        {tab === "preview" ? <PreviewPanel artifact={preview} loading={running} validation={validation} /> : null}
         {tab === "drawing" ? <DrawingPanel artifact={drawing} loading={running} /> : null}
         {tab === "parameters" ? (
           <ParameterControls
@@ -71,6 +72,30 @@ export function CADArtifactCanvas({
         {tab === "files" ? <FileList artifacts={artifacts} /> : null}
       </div>
     </section>
+  );
+}
+
+function PreviewPanel({
+  artifact,
+  loading,
+  validation,
+}: {
+  artifact?: CADArtifact;
+  loading: boolean;
+  validation?: ValidationReport;
+}) {
+  return (
+    <div className="preview-panel">
+      <RealModelViewer artifact={artifact} loading={loading} />
+      {validation ? (
+        <div className={validation.passed ? "validation-summary pass" : "validation-summary fail"}>
+          <strong>{validation.passed ? "Validation passed" : "Validation needs review"}</strong>
+          <span>
+            {validation.checks.filter((check) => check.passed).length}/{validation.checks.length} checks passed
+          </span>
+        </div>
+      ) : null}
+    </div>
   );
 }
 
@@ -127,10 +152,16 @@ function DrawingPanel({ artifact, loading }: { artifact?: CADArtifact; loading: 
     return <div className="empty-panel">The generated engineering drawing will appear here.</div>;
   }
   return (
-    <iframe
-      className="drawing-frame"
-      src={artifact.url}
-      title="Engineering drawing"
-    />
+    <div className="drawing-panel">
+      <a className="drawing-download" href={artifact.url} target="_blank" rel="noreferrer">
+        <Download size={15} />
+        Download drawing SVG
+      </a>
+      <iframe
+        className="drawing-frame"
+        src={artifact.url}
+        title="Engineering drawing"
+      />
+    </div>
   );
 }

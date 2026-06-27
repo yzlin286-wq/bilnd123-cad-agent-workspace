@@ -3,6 +3,7 @@ import { runCADKernel, CADRunnerNotConfiguredError } from "@/lib/cad/cad-runner-
 import { enforcePromptLimit, enforceRateLimit, friendlyJSONError } from "@/lib/server/request-guards";
 import { operationalErrorCode, userMessageForErrorCode } from "@/lib/server/failure-codes";
 import { appendRunHistory } from "@/lib/server/run-history";
+import { canAccessProject, forbiddenResponse, requireRequestAuth } from "@/lib/server/auth";
 import { appendProjectError, appendProjectMessage, appendProjectRevision, getProject } from "@/lib/server/project-store";
 import type { EngineeringSpec } from "@/lib/agent/spec";
 
@@ -11,6 +12,12 @@ export const runtime = "nodejs";
 export async function POST(request: Request) {
   const runId = randomUUID();
   const startedAt = performance.now();
+  const authResult = await requireRequestAuth(request);
+  if (authResult.response) {
+    await logRejectedRebuild(runId, startedAt, "AUTH_REQUIRED");
+    return authResult.response;
+  }
+  const auth = authResult.auth;
   const rateLimitResponse = enforceRateLimit(request);
   if (rateLimitResponse) {
     await logRejectedRebuild(runId, startedAt, "RATE_LIMITED");
@@ -35,6 +42,10 @@ export async function POST(request: Request) {
     return promptLimitResponse;
   }
   const project = body.projectId ? await getProject(body.projectId) : undefined;
+  if (project && !canAccessProject(auth, project)) {
+    await logRejectedRebuild(runId, startedAt, "FORBIDDEN", body.prompt);
+    return forbiddenResponse();
+  }
   if (project) {
     await appendProjectMessage({
       projectId: project.id,
@@ -58,6 +69,9 @@ export async function POST(request: Request) {
       status: "success",
       durationMs: performance.now() - startedAt,
       revision,
+      userId: auth.userId,
+      organizationId: auth.organizationId,
+      projectId: project?.id,
     });
     return Response.json({ revision });
   } catch (error) {
@@ -69,6 +83,9 @@ export async function POST(request: Request) {
         status: "failure",
         durationMs: performance.now() - startedAt,
         errorCode: "CAD_ENGINE_NOT_CONNECTED",
+        userId: auth.userId,
+        organizationId: auth.organizationId,
+        projectId: project?.id,
       });
       await appendProjectError({
         projectId: project?.id,
@@ -93,6 +110,9 @@ export async function POST(request: Request) {
       status: "failure",
       durationMs: performance.now() - startedAt,
       errorCode,
+      userId: auth.userId,
+      organizationId: auth.organizationId,
+      projectId: project?.id,
     });
     await appendProjectError({
       projectId: project?.id,

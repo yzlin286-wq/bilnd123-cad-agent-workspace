@@ -33,6 +33,13 @@ export function ParameterControls({
 
   return (
     <div className="parameter-controls">
+      <div className="properties-header">
+        <div>
+          <p className="microcopy">Properties</p>
+          <h3>{spec.partType}</h3>
+        </div>
+        <span>{spec.units}</span>
+      </div>
       {manifest.map((item) => (
         <label key={item.key}>
           <span>{item.label}</span>

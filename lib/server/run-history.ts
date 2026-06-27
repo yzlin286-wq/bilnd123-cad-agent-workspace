@@ -16,12 +16,18 @@ export async function appendRunHistory(entry: {
   durationMs: number;
   revision?: CADRevision;
   errorCode?: string;
+  userId?: string;
+  organizationId?: string;
+  projectId?: string;
 }) {
   const record = {
     timestamp: new Date().toISOString(),
     route: entry.route,
     runId: entry.runId,
     revisionId: entry.revision?.id,
+    projectId: entry.projectId,
+    userId: entry.userId,
+    organizationId: entry.organizationId,
     partType: entry.revision?.engineeringSpec.partType,
     model: entry.model,
     status: entry.status,

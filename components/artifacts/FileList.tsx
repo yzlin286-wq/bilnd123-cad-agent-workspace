@@ -10,6 +10,7 @@ export function FileList({ artifacts }: { artifacts: CADArtifact[] }) {
   if (!artifacts.length) {
     return <div className="empty-panel">Files will appear after the CAD engine finishes a revision.</div>;
   }
+  const primaryPackage = packageArtifact(artifacts);
 
   async function copySource(artifact: CADArtifact) {
     const response = await fetch(artifact.url);
@@ -21,6 +22,15 @@ export function FileList({ artifacts }: { artifacts: CADArtifact[] }) {
 
   return (
     <div className="file-list">
+      {primaryPackage ? (
+        <a className="package-primary" href={primaryPackage.url} target="_blank" rel="noreferrer">
+          <Download size={18} />
+          <div>
+            <strong>Download package.zip</strong>
+            <span>STEP, STL, drawing, source, spec, validation</span>
+          </div>
+        </a>
+      ) : null}
       {prioritizePackage(artifacts).map((artifact) => (
         <div className={artifact.kind === "package" ? "file-row package" : "file-row"} key={artifact.id}>
           <a href={artifact.url} target="_blank" rel="noreferrer">
@@ -39,6 +49,10 @@ export function FileList({ artifacts }: { artifacts: CADArtifact[] }) {
       ))}
     </div>
   );
+}
+
+function packageArtifact(artifacts: CADArtifact[]) {
+  return artifacts.find((artifact) => artifact.kind === "package");
 }
 
 function prioritizePackage(artifacts: CADArtifact[]) {

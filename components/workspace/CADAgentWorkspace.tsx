@@ -48,7 +48,13 @@ const REBUILD_WORKSTREAM_TEMPLATE: WorkstreamStep[] = [
   { id: "package", label: "Packaging files", status: "pending" },
 ];
 
-export function CADAgentWorkspace() {
+export function CADAgentWorkspace({
+  initialProjectId,
+  initialTemplate,
+}: {
+  initialProjectId?: string;
+  initialTemplate?: string;
+}) {
   const [hasStarted, setHasStarted] = useState(false);
   const [workspace, setWorkspace] = useState<WorkspaceState>(() => emptyWorkspace());
   const [recentProjects, setRecentProjects] = useState<StoredProjectSummary[]>([]);
@@ -61,7 +67,7 @@ export function CADAgentWorkspace() {
         const projects = await fetchProjectSummaries();
         if (cancelled) return;
         setRecentProjects(projects);
-        const latest = projects[0];
+        const latest = initialProjectId ? projects.find((project) => project.id === initialProjectId) : projects[0];
         if (latest?.latestRevisionId) {
           const project = await fetchProject(latest.id);
           if (!cancelled && project) {
@@ -77,7 +83,7 @@ export function CADAgentWorkspace() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [initialProjectId]);
 
   async function runPrompt(prompt: string) {
     setHasStarted(true);
@@ -266,7 +272,7 @@ export function CADAgentWorkspace() {
   }
 
   if (!hasStarted) {
-    return <HeroComposer onGenerate={runPrompt} />;
+    return <HeroComposer initialPrompt={promptForTemplate(initialTemplate)} onGenerate={runPrompt} />;
   }
 
   return (
@@ -276,6 +282,17 @@ export function CADAgentWorkspace() {
           <Sparkles size={17} />
         </div>
         <button onClick={startNewProject}>New CAD</button>
+        <div className="revision-timeline">
+          <span>Revisions</span>
+          {workspace.messages
+            .filter((message): message is Extract<ThreadMessage, { role: "agent" }> => message.role === "agent")
+            .map((message) => (
+              <button className={message.id === workspace.activeAgentId ? "active" : ""} key={message.id}>
+                <strong>{message.revisionLabel}</strong>
+                <small>{message.revision?.validation?.passed ? "Validated" : message.error ? "Attention" : "Ready"}</small>
+              </button>
+            ))}
+        </div>
         <div className="recent-rail">
           <span>Recent</span>
           {loadingRecent ? <small>Loading...</small> : null}
@@ -531,6 +548,16 @@ function cloneRebuildSteps() {
 
 function formatRevision(index: number) {
   return `Rev ${String(index).padStart(3, "0")}`;
+}
+
+function promptForTemplate(template: string | undefined) {
+  if (template === "l_bracket") {
+    return "Make a 90 x 60 x 40 mm L bracket, 5 mm thick, 5 mm holes, 12 mm edge offset, and 1 mm chamfer";
+  }
+  if (template === "mounting_plate") {
+    return "Make a 120 x 80 x 4 mm mounting plate with four 4.5 mm holes, 10 mm edge offset, and 1 mm chamfer";
+  }
+  return undefined;
 }
 
 async function safeResponseJSON(response: Response) {

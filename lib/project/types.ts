@@ -16,6 +16,8 @@ export type StoredRevision = CADRevision & {
 
 export type StoredProject = {
   id: string;
+  ownerUserId: string;
+  organizationId?: string;
   title: string;
   createdAt: string;
   updatedAt: string;
@@ -26,6 +28,8 @@ export type StoredProject = {
 
 export type StoredProjectSummary = {
   id: string;
+  ownerUserId: string;
+  organizationId?: string;
   title: string;
   createdAt: string;
   updatedAt: string;
@@ -33,4 +37,13 @@ export type StoredProjectSummary = {
   revisionCount: number;
   messageCount: number;
   partType?: string;
+};
+
+export type ArtifactOwnership = {
+  artifactId: string;
+  projectId: string;
+  revisionId: string;
+  ownerUserId: string;
+  organizationId?: string;
+  artifactKind: CADArtifact["kind"];
 };

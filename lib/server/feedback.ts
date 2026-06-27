@@ -13,6 +13,8 @@ export type FeedbackEntry = {
   rating: FeedbackRating;
   comment?: string;
   revisionId?: string;
+  userId?: string;
+  organizationId?: string;
   route?: string;
 };
 
@@ -20,12 +22,16 @@ export async function appendFeedback({
   rating,
   comment,
   revisionId,
+  userId,
+  organizationId,
   route,
   logPath = FEEDBACK_LOG_PATH,
 }: {
   rating: FeedbackRating;
   comment?: string;
   revisionId?: string;
+  userId?: string;
+  organizationId?: string;
   route?: string;
   logPath?: string;
 }) {
@@ -35,6 +41,8 @@ export async function appendFeedback({
     rating,
     comment: comment ? sanitizeStoredText(comment, 500) : undefined,
     revisionId: revisionId ? sanitizeStoredText(revisionId, 120) : undefined,
+    userId: userId ? sanitizeStoredText(userId, 120) : undefined,
+    organizationId: organizationId ? sanitizeStoredText(organizationId, 120) : undefined,
     route: route ? sanitizeStoredText(route, 120) : undefined,
   };
   await fs.mkdir(path.dirname(logPath), { recursive: true });
