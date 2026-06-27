@@ -6,7 +6,15 @@ ARG PIP_INDEX_URL=https://pypi.org/simple
 WORKDIR /app
 RUN sed -i "s|http://deb.debian.org/debian-security|${APT_SECURITY_MIRROR}|g; s|http://deb.debian.org/debian|${APT_MIRROR}|g" /etc/apt/sources.list.d/debian.sources
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends python3 python3-venv python3-pip \
+  && apt-get install -y --no-install-recommends \
+    libegl1 \
+    libgl1 \
+    libsm6 \
+    libxext6 \
+    libxrender1 \
+    python3 \
+    python3-pip \
+    python3-venv \
   && rm -rf /var/lib/apt/lists/*
 
 COPY package.json package-lock.json requirements.txt ./
