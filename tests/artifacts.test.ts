@@ -6,9 +6,7 @@ import { CAD_OUTPUT_ROOT, revisionFromManifest } from "../lib/cad/artifacts";
 
 test("revisionFromManifest rejects a manifest outside the CAD output root", async () => {
   const outside = path.resolve(CAD_OUTPUT_ROOT, "..", "outside-manifest.json");
-  await fs.writeFile(outside, "{}", "utf8");
   await assert.rejects(() => revisionFromManifest(outside), /escapes output root/);
-  await fs.rm(outside, { force: true });
 });
 
 test("revisionFromManifest rejects artifact paths that escape the CAD output root", async () => {
