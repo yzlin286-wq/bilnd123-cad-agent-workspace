@@ -1,0 +1,22 @@
+{
+	email {$LETSENCRYPT_EMAIL}
+}
+
+http://{$STAGING_DOMAIN} {
+	redir https://{host}{uri} permanent
+}
+
+https://{$STAGING_DOMAIN} {
+	encode zstd gzip
+	reverse_proxy cad-agent:3000
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+	}
+
+	# Basic Auth is currently enforced by the Next.js proxy middleware.
+	# To move Basic Auth to Caddy later, add a basicauth block with a
+	# caddy-hashed password and remove the app-level staging credentials.
+}

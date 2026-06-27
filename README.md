@@ -4,7 +4,7 @@ AI CAD Agent workspace built with Next.js, React, Three.js, and build123d.
 
 The product surface is intentionally user-facing: users start with natural language, then watch an agent workstream create an engineering spec, run the CAD kernel, validate geometry, and expose real artifacts for preview and download.
 
-Current stage: `v0.5 staging ready`.
+Current stage: `v0.6 staging hardening`.
 
 ## Product Shape
 
@@ -53,6 +53,7 @@ The build123d runner writes real files under `outputs/cad/<revision>/`:
 - `spec.json`
 - `validation.json`
 - `manifest.json`
+- `package.zip`
 - `run.log`
 
 `validation.json` is based on real build123d/STEP evidence:
@@ -111,9 +112,11 @@ npm run typecheck
 npm test
 npm run build
 npm run cleanup:cad
+npm run runs:summary
+npm run failures:export
 ```
 
-CI runs `npm ci`, lint, typecheck, unit tests, production build, and Python build123d smoke tests for both `mounting_plate` and `l_bracket`.
+CI runs `npm ci`, lint, typecheck, unit tests, production build, and Python build123d smoke tests for both `mounting_plate` and `l_bracket`. The runner smoke also checks `package.zip`.
 
 Local development URL:
 
@@ -134,8 +137,11 @@ Legacy diagnostic endpoints may remain for development, but the user-facing app 
 ## Staging
 
 - Deployment guide: `docs/STAGING_DEPLOYMENT.md`
+- HTTPS guide: `docs/HTTPS_STAGING.md`
 - Operations guide: `docs/OPERATIONS.md`
+- 48-72 hour test protocol: `docs/STAGING_TEST_PROTOCOL.md`
 - Docker compose file: `docker-compose.staging.yml`
+- HTTPS compose example: `docker-compose.staging.https.yml`
 - Manual smoke: `npm run smoke:staging`
 
-Staging must be protected with Basic Auth and is not suitable for public anonymous traffic.
+Staging must be protected with Basic Auth and is not suitable for public anonymous traffic. Basic Auth should not be used long-term over plaintext HTTP; use HTTPS, a private tunnel, Tailscale, or IP allowlist before broader internal testing.

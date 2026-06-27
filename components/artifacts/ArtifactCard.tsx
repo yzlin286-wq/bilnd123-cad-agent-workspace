@@ -1,6 +1,6 @@
 "use client";
 
-import { Download, FileCode2, FileJson2, FileText, Layers3 } from "lucide-react";
+import { Archive, Download, FileCode2, FileJson2, FileText, Layers3 } from "lucide-react";
 import type { CADArtifact } from "@/lib/agent/spec";
 
 export function ArtifactCard({ artifact }: { artifact: CADArtifact }) {
@@ -17,6 +17,7 @@ export function ArtifactCard({ artifact }: { artifact: CADArtifact }) {
 function iconFor(kind: CADArtifact["kind"]) {
   if (kind === "stl") return <Layers3 size={18} />;
   if (kind === "source") return <FileCode2 size={18} />;
+  if (kind === "package") return <Archive size={18} />;
   if (kind === "validation" || kind === "spec" || kind === "manifest") return <FileJson2 size={18} />;
   return <FileText size={18} />;
 }
@@ -27,6 +28,7 @@ function labelFor(artifact: CADArtifact) {
   if (artifact.kind === "drawingSvg") return "Drawing SVG";
   if (artifact.kind === "source") return "Source code";
   if (artifact.kind === "validation") return "Validation";
+  if (artifact.kind === "package") return "Download package";
   return artifact.label;
 }
 

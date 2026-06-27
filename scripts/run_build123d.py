@@ -10,6 +10,7 @@ import json
 import math
 import sys
 import uuid
+import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -29,18 +30,30 @@ def main() -> int:
         validation_path = write_validation(spec, build_result["metrics"], run_dir / "validation.json")
         spec_path = run_dir / "spec.json"
         spec_path.write_text(json.dumps(spec, indent=2), encoding="utf-8")
-        manifest_path = write_manifest(
-            spec,
-            build_result["metrics"],
-            {
-                **build_result["artifacts"],
-                "drawingSvg": drawing_path,
-                "source": source_path,
-                "spec": spec_path,
-                "validation": validation_path,
-            },
-            run_dir / "manifest.json",
-        )
+        artifact_paths = {
+            **build_result["artifacts"],
+            "drawingSvg": drawing_path,
+            "source": source_path,
+            "spec": spec_path,
+            "validation": validation_path,
+        }
+        manifest_path = run_dir / "manifest.json"
+        package_path = run_dir / "package.zip"
+        write_manifest(spec, build_result["metrics"], artifact_paths, manifest_path)
+        package_path = write_package(artifact_paths, manifest_path, package_path)
+        last_package_size = package_path.stat().st_size
+        for _ in range(5):
+            manifest_path = write_manifest(
+                spec,
+                build_result["metrics"],
+                {**artifact_paths, "package": package_path},
+                manifest_path,
+            )
+            package_path = write_package(artifact_paths, manifest_path, package_path)
+            current_package_size = package_path.stat().st_size
+            if current_package_size == last_package_size:
+                break
+            last_package_size = current_package_size
         log_path = run_dir / "run.log"
         log_path.write_text(
             "\n".join(
@@ -51,6 +64,7 @@ def main() -> int:
                     f"{iso_now()} export_stl ok",
                     f"{iso_now()} render_svg_drawing ok",
                     f"{iso_now()} validate_geometry ok",
+                    f"{iso_now()} package_zip ok",
                     f"{iso_now()} write_manifest ok",
                 ]
             ),
@@ -68,6 +82,7 @@ def main() -> int:
                         "source": str(source_path),
                         "spec": str(spec_path),
                         "validation": str(validation_path),
+                        "package": str(package_path),
                         "manifest": str(manifest_path),
                         "log": str(log_path),
                     },
@@ -458,6 +473,7 @@ def write_manifest(
             artifact("source", "build123d source", artifacts["source"]),
             artifact("spec", "Engineering spec", artifacts["spec"]),
             artifact("validation", "Validation report", artifacts["validation"]),
+            *([artifact("package", "Complete artifact package", artifacts["package"])] if "package" in artifacts else []),
         ],
         "metrics": metrics,
     }
@@ -509,6 +525,22 @@ def artifact(kind: str, label: str, path: Path) -> dict[str, Any]:
         "path": str(path),
         "bytes": path.stat().st_size,
     }
+
+
+def write_package(artifacts: dict[str, Path], manifest_path: Path, package_path: Path) -> Path:
+    files = [
+        artifacts["step"],
+        artifacts["stl"],
+        artifacts["drawingSvg"],
+        artifacts["source"],
+        artifacts["spec"],
+        artifacts["validation"],
+        manifest_path,
+    ]
+    with zipfile.ZipFile(package_path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        for file_path in files:
+            archive.write(file_path, arcname=file_path.name)
+    return package_path
 
 
 def vector_to_dict(vector: Any) -> dict[str, float]:

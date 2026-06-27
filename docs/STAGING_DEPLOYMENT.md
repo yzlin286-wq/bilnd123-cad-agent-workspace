@@ -57,6 +57,12 @@ Persistent data:
 - `cad_outputs` volume -> `/app/outputs/cad`
 - `run_logs` volume -> `/app/logs`
 
+For domain-based HTTPS, use `docs/HTTPS_STAGING.md` and the standalone Caddy example:
+
+```bash
+docker compose -f docker-compose.staging.https.yml --env-file .env up -d --build
+```
+
 ## Real Model Configuration
 
 Use an OpenAI-compatible `/chat/completions` endpoint in `CAD_AGENT_BASE_URL`.
@@ -71,7 +77,7 @@ In Docker, use:
 CAD_RUNNER_COMMAND=/app/.venv/bin/python scripts/run_build123d.py
 ```
 
-The runner produces real `STEP`, `STL`, `SVG`, `source.py`, `validation.json`, and `manifest.json` files. If build123d cannot run, the app returns a friendly error and does not fabricate artifacts.
+The runner produces real `STEP`, `STL`, `SVG`, `source.py`, `validation.json`, `manifest.json`, and `package.zip` files. If build123d cannot run, the app returns a friendly error and does not fabricate artifacts.
 
 ## Basic Auth
 
@@ -84,6 +90,8 @@ STAGING_BASIC_AUTH_PASSWORD=...
 
 When both are set, the staging access gate protects the app and APIs. Unauthenticated requests return `401`.
 
+Do not run Basic Auth over long-lived plaintext HTTP. Use HTTPS before inviting internal testers beyond a brief private smoke check.
+
 ## Staging Smoke
 
 After deployment:
@@ -95,7 +103,7 @@ STAGING_BASIC_AUTH_PASSWORD=... \
 npm run smoke:staging
 ```
 
-The smoke script checks `/api/health`, creates a `mounting_plate`, revises thickness to `6 mm`, verifies unchanged dimensions, and downloads generated artifacts.
+The smoke script checks `/api/health`, creates a `mounting_plate`, revises thickness to `6 mm`, verifies unchanged dimensions, and downloads generated artifacts including `package.zip`.
 
 ## Logs
 
@@ -106,6 +114,18 @@ logs/runs.jsonl
 ```
 
 Each line includes route, run id, revision id, part type, model name when available, status, duration, artifact count, validation status, and truncated prompt. It never records API keys.
+
+Summarize runs:
+
+```bash
+npm run runs:summary
+```
+
+Export sanitized failure samples:
+
+```bash
+npm run failures:export
+```
 
 ## Cleanup
 

@@ -29,10 +29,52 @@ Useful environment variables:
 - `CAD_OUTPUT_RETENTION_HOURS`: default `72`
 - `CAD_OUTPUT_MAX_BYTES`: optional byte cap; oldest run directories are deleted first
 
+`CAD_OUTPUT_RETENTION_HOURS` controls time-based retention. `CAD_OUTPUT_MAX_BYTES` controls total bytes under `outputs/cad`; when the cap is exceeded, the oldest run directories are removed first.
+
 Example cron entry:
 
 ```cron
 15 * * * * cd /opt/bilnd123-cad-agent-workspace && npm run cleanup:cad >> logs/cleanup.log 2>&1
+```
+
+Container cron example:
+
+```cron
+15 * * * * cd /opt/bilnd123-cad-agent-workspace && docker compose -f docker-compose.staging.yml exec -T cad-agent npm run cleanup:cad >> /var/log/bilnd123-cleanup.log 2>&1
+```
+
+Systemd timer example:
+
+```ini
+# /etc/systemd/system/bilnd123-cleanup.service
+[Unit]
+Description=Cleanup bilnd123 CAD outputs
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/bilnd123-cad-agent-workspace
+ExecStart=/usr/bin/docker compose -f docker-compose.staging.yml exec -T cad-agent npm run cleanup:cad
+```
+
+```ini
+# /etc/systemd/system/bilnd123-cleanup.timer
+[Unit]
+Description=Run bilnd123 CAD cleanup hourly
+
+[Timer]
+OnCalendar=hourly
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+```
+
+Enable it:
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable --now bilnd123-cleanup.timer
+systemctl list-timers bilnd123-cleanup.timer
 ```
 
 The cleanup script only removes direct run directories under `outputs/cad`, does not delete the root directory, and does not follow symlinks.
@@ -100,20 +142,82 @@ Only these `partType` values are supported:
 
 Unsupported templates fail with a user-readable error and do not generate placeholder CAD.
 
-## API Key Rotation
+## Secret Rotation
+
+### Rotate `CAD_AGENT_API_KEY`
 
 1. Create the replacement key in the model provider.
-2. Update the server `.env` file.
-3. Restart the staging service:
+2. Edit the server-only `.env` file:
+
+```bash
+cd /opt/bilnd123-cad-agent-workspace
+nano .env
+```
+
+3. Replace only `CAD_AGENT_API_KEY`.
+4. Confirm permissions:
+
+```bash
+stat -c '%a %U:%G %n' .env
+chmod 600 .env
+```
+
+5. Restart only this project:
 
 ```bash
 docker compose -f docker-compose.staging.yml --env-file .env up -d
 ```
 
-4. Run `npm run smoke:staging`.
-5. Revoke the old key.
+6. Run `npm run smoke:staging` from a trusted machine with staging auth.
+7. Revoke the old key at the provider.
+
+### Rotate `STAGING_BASIC_AUTH_PASSWORD`
+
+1. Generate a replacement on the server:
+
+```bash
+openssl rand -base64 32
+```
+
+2. Update `STAGING_BASIC_AUTH_PASSWORD` in `.env`.
+3. Keep `.env` locked down:
+
+```bash
+chmod 600 .env
+stat -c '%a %U:%G %n' .env
+```
+
+4. Restart only this project:
+
+```bash
+docker compose -f docker-compose.staging.yml --env-file .env up -d
+```
+
+5. Verify unauthenticated and authenticated health:
+
+```bash
+curl -i http://127.0.0.1:12601/api/health
+curl -u "$STAGING_BASIC_AUTH_USER:$STAGING_BASIC_AUTH_PASSWORD" http://127.0.0.1:12601/api/health
+```
 
 Never commit real keys, cookies, tokens, or private server passwords to the repository.
+
+### Scan Run Logs For Secret Leakage
+
+Run history should not contain model keys, Basic Auth passwords, cookies, SSH passwords, or full stderr. After rotating secrets or changing logging, scan the log file:
+
+```bash
+grep -E 'sk-|Bearer |Basic |api[_-]?key|password|token|secret' logs/runs.jsonl || true
+```
+
+If the app is containerized:
+
+```bash
+docker compose -f docker-compose.staging.yml exec -T cad-agent sh -lc \
+  "grep -E 'sk-|Bearer |Basic |api[_-]?key|password|token|secret' /app/logs/runs.jsonl || true"
+```
+
+If anything sensitive appears, rotate that secret, export only sanitized failures, and remove the compromised log copy from shared channels.
 
 ## Run Logs
 
@@ -124,3 +228,39 @@ tail -n 50 logs/runs.jsonl
 ```
 
 Fields include timestamp, route, runId, revisionId, partType, model, status, durationMs, artifactCount, validationPassed, errorCode, and truncated prompt.
+
+Summarize run history:
+
+```bash
+npm run runs:summary
+```
+
+Export sanitized failure samples:
+
+```bash
+npm run failures:export
+```
+
+The failure corpus is written to:
+
+```text
+outputs/failures/failures.json
+```
+
+It includes only sanitized prompt, route, errorCode, partType, durationMs, and timestamp. It must not include API keys, Basic Auth values, full stderr, cookies, or server filesystem paths.
+
+## Artifact Download Auth
+
+`GET /api/artifacts/[id]` is protected by the same staging Basic Auth middleware as the rest of the app. The middleware matcher covers `/api/artifacts/...` and excludes only Next.js static image/static asset paths.
+
+Verify from outside:
+
+```bash
+curl -i http://staging-host.example.com/api/artifacts/some-id
+```
+
+Expected unauthenticated result:
+
+```text
+401 Authentication required
+```

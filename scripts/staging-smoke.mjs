@@ -32,7 +32,7 @@ for (const key of ["length", "width", "holeDiameter", "edgeOffset", "chamfer"]) 
   );
 }
 
-for (const kind of ["step", "stl", "validation"]) {
+for (const kind of ["step", "stl", "validation", "package"]) {
   const artifact = rev002.artifacts.find((item) => item.kind === kind);
   assert(artifact, `missing ${kind} artifact`);
   const response = await fetchURL(artifact.url);

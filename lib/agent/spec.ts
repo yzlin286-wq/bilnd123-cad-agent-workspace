@@ -37,6 +37,7 @@ export type CADArtifactKind =
   | "spec"
   | "validation"
   | "manifest"
+  | "package"
   | "log";
 
 export type CADArtifact = {

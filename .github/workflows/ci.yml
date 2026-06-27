@@ -72,4 +72,7 @@ jobs:
               assert validation["metrics"]["partType"] == part_type
               assert Path(payload["artifacts"]["step"]).stat().st_size > 0
               assert Path(payload["artifacts"]["stl"]).stat().st_size > 0
+              assert Path(payload["artifacts"]["package"]).stat().st_size > 0
+              manifest = json.loads(Path(payload["artifacts"]["manifest"]).read_text())
+              assert any(item["kind"] == "package" and item["name"] == "package.zip" for item in manifest["artifacts"])
           PY

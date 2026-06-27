@@ -28,6 +28,7 @@ const MIME_BY_EXT: Record<string, string> = {
   ".py": "text/x-python; charset=utf-8",
   ".json": "application/json; charset=utf-8",
   ".log": "text/plain; charset=utf-8",
+  ".zip": "application/zip",
 };
 
 export function artifactIdFromPath(filePath: string) {

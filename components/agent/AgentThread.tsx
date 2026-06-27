@@ -100,7 +100,9 @@ function AgentMessage({ message }: { message: Extract<ThreadMessage, { role: "ag
         {message.artifacts.length ? (
           <div className="artifact-strip">
             {message.artifacts
-              .filter((artifact) => ["step", "stl", "drawingSvg", "source", "validation"].includes(artifact.kind))
+              .filter((artifact) =>
+                ["step", "stl", "drawingSvg", "source", "validation", "package"].includes(artifact.kind),
+              )
               .map((artifact) => (
                 <ArtifactCard artifact={artifact} key={artifact.id} />
               ))}
