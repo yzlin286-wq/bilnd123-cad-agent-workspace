@@ -6,11 +6,14 @@ import { findArtifact } from "@/lib/cad/artifacts";
 import { mergeRevisionSpec, normalizeSpec } from "@/lib/agent/spec-merge";
 import { callSpecRevisionPlanner, callWorkstreamPlanner, repairJSONCandidate } from "@/lib/server/openai-compatible";
 import { getRuntimeConfig, isLLMConfigured } from "@/lib/server/runtime";
+import { appendRunHistory, type RunHistoryRoute } from "@/lib/server/run-history";
 
 type Emit = (event: AgentEvent) => void | Promise<void>;
 
-export async function runAgentOrchestration(prompt: string, emit: Emit) {
+export async function runAgentOrchestration(prompt: string, emit: Emit, route: RunHistoryRoute = "/api/agent/run") {
   const runId = randomUUID();
+  const startedAt = performance.now();
+  let model: string | undefined;
   await emit({ type: "run.started", runId, prompt });
   await emitStep(emit, "understand", "Understanding request", "running");
 
@@ -22,11 +25,21 @@ export async function runAgentOrchestration(prompt: string, emit: Emit) {
       message: "Real LLM runtime is not configured.",
       userMessage: "AI CAD engine not connected. Add your model endpoint before generating from natural language.",
     });
+    await appendRunHistory({
+      route,
+      runId,
+      prompt,
+      status: "failure",
+      durationMs: performance.now() - startedAt,
+      errorCode: "AI_ENGINE_NOT_CONNECTED",
+    });
     return;
   }
 
   try {
-    const spec = await createEngineeringSpec(prompt);
+    const created = await createEngineeringSpec(prompt);
+    const spec = created.spec;
+    model = created.model;
     await emitStep(emit, "understand", "Understanding request", "done");
     await emitStep(emit, "spec", "Creating engineering spec", "done", `${spec.length} x ${spec.width} x ${spec.thickness} ${spec.units}`);
     await emit({ type: "spec", spec });
@@ -55,6 +68,15 @@ export async function runAgentOrchestration(prompt: string, emit: Emit) {
     }
     await emit({ type: "revision", revision });
     await emit({ type: "run.completed", revision });
+    await appendRunHistory({
+      route,
+      runId,
+      prompt,
+      model,
+      status: "success",
+      durationMs: performance.now() - startedAt,
+      revision,
+    });
   } catch (error) {
     if (error instanceof CADRunnerNotConfiguredError) {
       await emitStep(emit, "kernel", "Running CAD kernel", "failed", "The CAD engine is not connected.");
@@ -63,6 +85,15 @@ export async function runAgentOrchestration(prompt: string, emit: Emit) {
         code: "CAD_ENGINE_NOT_CONNECTED",
         message: error.message,
         userMessage: "CAD engine not connected. Connect build123d before generating files.",
+      });
+      await appendRunHistory({
+        route,
+        runId,
+        prompt,
+        model,
+        status: "failure",
+        durationMs: performance.now() - startedAt,
+        errorCode: "CAD_ENGINE_NOT_CONNECTED",
       });
       return;
     }
@@ -73,6 +104,15 @@ export async function runAgentOrchestration(prompt: string, emit: Emit) {
       message: error instanceof Error ? error.message : "Unknown agent failure.",
       userMessage: userFacingRunError(error, "The CAD agent could not finish this revision. Review the prompt or engine connection and try again."),
     });
+    await appendRunHistory({
+      route,
+      runId,
+      prompt,
+      model,
+      status: "failure",
+      durationMs: performance.now() - startedAt,
+      errorCode: "AGENT_RUN_FAILED",
+    });
   }
 }
 
@@ -81,13 +121,17 @@ export async function runRevisionOrchestration({
   currentRevisionId,
   userPrompt,
   emit,
+  route = "/api/agent/revise",
 }: {
   currentSpec: EngineeringSpec;
   currentRevisionId: string;
   userPrompt: string;
   emit: Emit;
+  route?: RunHistoryRoute;
 }) {
   const runId = randomUUID();
+  const startedAt = performance.now();
+  let model: string | undefined;
   await emit({ type: "run.started", runId, prompt: userPrompt });
   await emitStep(emit, "understand", "Understanding revision", "running");
 
@@ -99,11 +143,21 @@ export async function runRevisionOrchestration({
       message: "Real LLM runtime is not configured.",
       userMessage: "AI CAD engine not connected. Add your model endpoint before revising this model.",
     });
+    await appendRunHistory({
+      route,
+      runId,
+      prompt: userPrompt,
+      status: "failure",
+      durationMs: performance.now() - startedAt,
+      errorCode: "AI_ENGINE_NOT_CONNECTED",
+    });
     return;
   }
 
   try {
-    const spec = await reviseEngineeringSpec({ currentSpec, currentRevisionId, userPrompt });
+    const revised = await reviseEngineeringSpec({ currentSpec, currentRevisionId, userPrompt });
+    const spec = revised.spec;
+    model = revised.model;
     await emitStep(emit, "understand", "Understanding revision", "done");
     await emitStep(emit, "spec", "Updating engineering spec", "done", `${spec.length} x ${spec.width} x ${spec.thickness} ${spec.units}`);
     await emit({ type: "spec", spec });
@@ -130,6 +184,15 @@ export async function runRevisionOrchestration({
     }
     await emit({ type: "revision", revision });
     await emit({ type: "run.completed", revision });
+    await appendRunHistory({
+      route,
+      runId,
+      prompt: userPrompt,
+      model,
+      status: "success",
+      durationMs: performance.now() - startedAt,
+      revision,
+    });
   } catch (error) {
     if (error instanceof CADRunnerNotConfiguredError) {
       await emitStep(emit, "kernel", "Running CAD kernel", "failed", "The CAD engine is not connected.");
@@ -139,6 +202,15 @@ export async function runRevisionOrchestration({
         message: error.message,
         userMessage: "CAD engine not connected. Connect build123d before rebuilding this revision.",
       });
+      await appendRunHistory({
+        route,
+        runId,
+        prompt: userPrompt,
+        model,
+        status: "failure",
+        durationMs: performance.now() - startedAt,
+        errorCode: "CAD_ENGINE_NOT_CONNECTED",
+      });
       return;
     }
 
@@ -147,6 +219,15 @@ export async function runRevisionOrchestration({
       code: "REVISION_FAILED",
       message: error instanceof Error ? error.message : "Unknown revision failure.",
       userMessage: userFacingRunError(error, "The CAD agent could not revise this model. Check the instruction and try again."),
+    });
+    await appendRunHistory({
+      route,
+      runId,
+      prompt: userPrompt,
+      model,
+      status: "failure",
+      durationMs: performance.now() - startedAt,
+      errorCode: "REVISION_FAILED",
     });
   }
 }
@@ -159,7 +240,7 @@ function userFacingRunError(error: unknown, fallback: string) {
   return fallback;
 }
 
-async function createEngineeringSpec(prompt: string): Promise<EngineeringSpec> {
+async function createEngineeringSpec(prompt: string): Promise<{ spec: EngineeringSpec; model: string }> {
   const result = await callWorkstreamPlanner({
     prompt,
     config: getRuntimeConfig(),
@@ -169,7 +250,7 @@ async function createEngineeringSpec(prompt: string): Promise<EngineeringSpec> {
   if (!isRecord(raw)) {
     throw new Error("AI model returned an invalid engineering spec.");
   }
-  return normalizeSpec(raw);
+  return { spec: normalizeSpec(raw), model: result.model };
 }
 
 async function reviseEngineeringSpec({
@@ -188,11 +269,14 @@ async function reviseEngineeringSpec({
     config: getRuntimeConfig(),
   });
   const payload = extractJSON(result.content);
-  return mergeRevisionSpec({
-    currentSpec,
-    specDelta: payload.specDelta,
-    engineeringSpec: payload.engineeringSpec,
-  });
+  return {
+    spec: mergeRevisionSpec({
+      currentSpec,
+      specDelta: payload.specDelta,
+      engineeringSpec: payload.engineeringSpec,
+    }),
+    model: result.model,
+  };
 }
 
 function extractJSON(content: string) {

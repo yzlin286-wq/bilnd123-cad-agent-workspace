@@ -4,6 +4,8 @@ AI CAD Agent workspace built with Next.js, React, Three.js, and build123d.
 
 The product surface is intentionally user-facing: users start with natural language, then watch an agent workstream create an engineering spec, run the CAD kernel, validate geometry, and expose real artifacts for preview and download.
 
+Current stage: `v0.5 staging ready`.
+
 ## Product Shape
 
 - Landing page: `Build CAD with natural language`
@@ -13,6 +15,15 @@ The product surface is intentionally user-facing: users start with natural langu
 - No user-facing internal control panels
 - Supported CAD templates: `mounting_plate` and `l_bracket`
 - Upload sketch: visible as `Coming soon`, disabled until image-to-CAD is implemented
+
+Not currently supported:
+
+- Sketch/image upload to CAD
+- Arbitrary CAD parts beyond the supported templates
+- Assemblies
+- Complex production drawings
+- Public anonymous production traffic
+- Payment, tenancy, BOM, or RFQ flows
 
 ## No Fallback Policy
 
@@ -24,6 +35,7 @@ This project must not fabricate CAD or agent results.
 - If the AI engine is missing, the UI shows a friendly connection message and does not generate fake CAD.
 - Parameter rebuilds go through `POST /api/cad/rebuild` and require a real `CAD_RUNNER_COMMAND`.
 - If build123d is unavailable, the runner exits non-zero and no fake artifacts are produced.
+- Model API keys must exist only in server environment variables. Do not expose them with `NEXT_PUBLIC_`.
 
 ## Real CAD Artifacts
 
@@ -71,6 +83,13 @@ CAD_AGENT_API_KEY=replace-with-real-key
 CAD_AGENT_PRIMARY_MODEL=primary-real-model
 CAD_AGENT_DOWNGRADE_MODEL=secondary-real-model
 CAD_RUNNER_COMMAND=python scripts/run_build123d.py
+STAGING_BASIC_AUTH_USER=replace-with-staging-user
+STAGING_BASIC_AUTH_PASSWORD=replace-with-strong-staging-password
+MAX_PROMPT_CHARS=2000
+CAD_RUNNER_TIMEOUT_MS=60000
+CAD_MAX_CONCURRENT_RUNS=1
+CAD_OUTPUT_RETENTION_HOURS=72
+CAD_OUTPUT_MAX_BYTES=1073741824
 ```
 
 For local build123d validation on Windows:
@@ -91,6 +110,7 @@ npm run lint
 npm run typecheck
 npm test
 npm run build
+npm run cleanup:cad
 ```
 
 CI runs `npm ci`, lint, typecheck, unit tests, production build, and Python build123d smoke tests for both `mounting_plate` and `l_bracket`.
@@ -103,9 +123,19 @@ http://127.0.0.1:3000
 
 ## Main APIs
 
+- `GET /api/health`: safe health summary for staging
 - `POST /api/agent/run`: SSE agent orchestration endpoint
 - `POST /api/agent/revise`: SSE revision endpoint that applies `currentSpec + specDelta` by default
 - `POST /api/cad/rebuild`: rebuilds a revision from an explicit parameter/spec payload
 - `GET /api/artifacts/[id]`: streams generated artifacts from local output storage
 
 Legacy diagnostic endpoints may remain for development, but the user-facing app is driven by the agent/rebuild/artifact flow above.
+
+## Staging
+
+- Deployment guide: `docs/STAGING_DEPLOYMENT.md`
+- Operations guide: `docs/OPERATIONS.md`
+- Docker compose file: `docker-compose.staging.yml`
+- Manual smoke: `npm run smoke:staging`
+
+Staging must be protected with Basic Auth and is not suitable for public anonymous traffic.

@@ -13,6 +13,15 @@ type CADRunnerStdout = {
   error?: string;
 };
 
+type QueueWaiter = {
+  resolve: () => void;
+  reject: (error: Error) => void;
+  timer: ReturnType<typeof setTimeout>;
+};
+
+let activeRunnerCount = 0;
+const runnerQueue: QueueWaiter[] = [];
+
 export class CADRunnerNotConfiguredError extends Error {
   constructor() {
     super("CAD runner command is not configured.");
@@ -27,30 +36,78 @@ export async function runCADKernel({
   spec: EngineeringSpec;
   prompt?: string;
 }): Promise<CADRevision> {
-  const command = getRuntimeConfig().cadRunnerCommand;
+  const config = getRuntimeConfig();
+  const command = config.cadRunnerCommand;
   if (!command) {
     throw new CADRunnerNotConfiguredError();
   }
 
-  const result = await runConfiguredCommand(command, {
-    spec,
-    outputDir: CAD_OUTPUT_ROOT,
+  return withCADRunnerSlot(config.cadRunnerTimeoutMs, config.cadMaxConcurrentRuns, async () => {
+    const result = await runConfiguredCommand(
+      command,
+      {
+        spec,
+        outputDir: CAD_OUTPUT_ROOT,
+      },
+      config.cadRunnerTimeoutMs,
+    );
+
+    if (result.exitCode !== 0) {
+      const runnerError = parseRunnerError(result.stderr);
+      throw new Error(runnerError || `CAD runner exited with ${result.exitCode}`);
+    }
+
+    const payload = parseRunnerStdout(result.stdout);
+    if (!payload.ok || !payload.artifacts?.manifest) {
+      throw new Error(payload.error || "CAD runner did not return a manifest.");
+    }
+
+    return revisionFromManifest(path.resolve(payload.artifacts.manifest), prompt);
   });
-
-  if (result.exitCode !== 0) {
-    const runnerError = parseRunnerError(result.stderr);
-    throw new Error(runnerError || `CAD runner exited with ${result.exitCode}`);
-  }
-
-  const payload = parseRunnerStdout(result.stdout);
-  if (!payload.ok || !payload.artifacts?.manifest) {
-    throw new Error(payload.error || "CAD runner did not return a manifest.");
-  }
-
-  return revisionFromManifest(path.resolve(payload.artifacts.manifest), prompt);
 }
 
-function runConfiguredCommand(command: string, body: unknown) {
+async function withCADRunnerSlot<T>(timeoutMs: number, maxConcurrentRuns: number, task: () => Promise<T>) {
+  await acquireRunnerSlot(timeoutMs, maxConcurrentRuns);
+  try {
+    return await task();
+  } finally {
+    releaseRunnerSlot(maxConcurrentRuns);
+  }
+}
+
+function acquireRunnerSlot(timeoutMs: number, maxConcurrentRuns: number) {
+  if (activeRunnerCount < maxConcurrentRuns) {
+    activeRunnerCount += 1;
+    return Promise.resolve();
+  }
+
+  return new Promise<void>((resolve, reject) => {
+    const waiter: QueueWaiter = {
+      resolve: () => {
+        clearTimeout(waiter.timer);
+        activeRunnerCount += 1;
+        resolve();
+      },
+      reject,
+      timer: setTimeout(() => {
+        const index = runnerQueue.indexOf(waiter);
+        if (index >= 0) runnerQueue.splice(index, 1);
+        reject(new Error("CAD runner queue timed out. Please retry when the current job finishes."));
+      }, timeoutMs),
+    };
+    runnerQueue.push(waiter);
+  });
+}
+
+function releaseRunnerSlot(maxConcurrentRuns: number) {
+  activeRunnerCount = Math.max(0, activeRunnerCount - 1);
+  while (runnerQueue.length > 0 && activeRunnerCount < maxConcurrentRuns) {
+    const waiter = runnerQueue.shift();
+    waiter?.resolve();
+  }
+}
+
+function runConfiguredCommand(command: string, body: unknown, timeoutMs: number) {
   return new Promise<{
     exitCode: number | null;
     stdout: string;
@@ -66,8 +123,8 @@ function runConfiguredCommand(command: string, body: unknown) {
     let stderr = "";
     const timer = setTimeout(() => {
       child.kill();
-      stderr += "\nCAD runner timed out after 60 seconds.";
-    }, 60_000);
+      stderr += `\nCAD runner timed out after ${timeoutMs} ms.`;
+    }, timeoutMs);
 
     child.stdout.on("data", (chunk) => {
       stdout += chunk.toString();

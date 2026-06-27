@@ -2,7 +2,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import type { CADArtifact, CADArtifactKind, CADRevision, EngineeringSpec, ParameterManifestItem, ValidationReport } from "@/lib/agent/spec";
 
-export const CAD_OUTPUT_ROOT = path.resolve(process.cwd(), "outputs", "cad");
+export const CAD_OUTPUT_ROOT = path.resolve(/*turbopackIgnore: true*/ process.cwd(), "outputs", "cad");
 
 type RunnerManifestArtifact = {
   kind: CADArtifactKind;

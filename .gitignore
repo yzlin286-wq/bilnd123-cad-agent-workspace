@@ -5,6 +5,7 @@ out
 dist
 coverage
 outputs
+logs
 .env
 .env.*
 !.env.example

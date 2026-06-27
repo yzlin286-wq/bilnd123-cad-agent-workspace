@@ -225,11 +225,15 @@ async function callOpenAICompatibleModel({
   };
   let response = await postChatCompletion(endpoint, config.apiKey, body);
 
-  if (!response.ok && (await response.clone().text()).match(/response_format|json_schema|schema/i)) {
+  if (await isResponseFormatUnsupported(response)) {
     response = await postChatCompletion(endpoint, config.apiKey, {
       ...body,
       response_format: { type: "json_object" },
     });
+  }
+
+  if (await isResponseFormatUnsupported(response)) {
+    response = await postChatCompletion(endpoint, config.apiKey, withoutResponseFormat(body));
   }
 
   const text = await response.text();
@@ -259,6 +263,18 @@ function postChatCompletion(endpoint: string, apiKey: string | undefined, body: 
     },
     body: JSON.stringify(body),
   });
+}
+
+async function isResponseFormatUnsupported(response: Response) {
+  if (response.ok) return false;
+  const text = await response.clone().text();
+  return /response_format|json_schema|schema/i.test(text);
+}
+
+function withoutResponseFormat(body: Record<string, unknown>) {
+  const plainBody = { ...body };
+  delete plainBody.response_format;
+  return plainBody;
 }
 
 function assertValidJSON(content: string) {

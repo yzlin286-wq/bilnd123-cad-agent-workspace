@@ -5,8 +5,10 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "cleanup:cad": "node scripts/cleanup-cad-outputs.mjs",
     "start": "next start",
     "lint": "eslint .",
+    "smoke:staging": "node scripts/staging-smoke.mjs",
     "test": "tsx --test tests/**/*.test.ts",
     "typecheck": "tsc --noEmit"
   },

@@ -4,6 +4,11 @@ export type AgentRuntimeConfig = {
   primaryModel?: string;
   downgradeModel?: string;
   cadRunnerCommand?: string;
+  cadRunnerTimeoutMs: number;
+  cadMaxConcurrentRuns: number;
+  maxPromptChars: number;
+  cadOutputRetentionHours: number;
+  cadOutputMaxBytes?: number;
 };
 
 export function getRuntimeConfig(): AgentRuntimeConfig {
@@ -13,6 +18,11 @@ export function getRuntimeConfig(): AgentRuntimeConfig {
     primaryModel: process.env.CAD_AGENT_PRIMARY_MODEL,
     downgradeModel: process.env.CAD_AGENT_DOWNGRADE_MODEL,
     cadRunnerCommand: process.env.CAD_RUNNER_COMMAND,
+    cadRunnerTimeoutMs: positiveInt(process.env.CAD_RUNNER_TIMEOUT_MS, 60_000),
+    cadMaxConcurrentRuns: positiveInt(process.env.CAD_MAX_CONCURRENT_RUNS, 1),
+    maxPromptChars: positiveInt(process.env.MAX_PROMPT_CHARS, 2_000),
+    cadOutputRetentionHours: positiveInt(process.env.CAD_OUTPUT_RETENTION_HOURS, 72),
+    cadOutputMaxBytes: optionalPositiveInt(process.env.CAD_OUTPUT_MAX_BYTES),
   };
 }
 
@@ -30,4 +40,17 @@ export function isLLMConfigured(config = getRuntimeConfig()) {
 
 export function isCADRunnerConfigured(config = getRuntimeConfig()) {
   return Boolean(config.cadRunnerCommand);
+}
+
+function positiveInt(value: string | undefined, fallback: number) {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed <= 0) return fallback;
+  return parsed;
+}
+
+function optionalPositiveInt(value: string | undefined) {
+  if (!value) return undefined;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed <= 0) return undefined;
+  return parsed;
 }
