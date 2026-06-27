@@ -1,0 +1,150 @@
+#!/usr/bin/env node
+import { promises as fs } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { classifyRunHistory } from "./classify-runs.mjs";
+import { summarizeRunHistory } from "./summarize-runs.mjs";
+
+const DEFAULT_LOG_PATH = path.resolve(process.cwd(), "logs", "runs.jsonl");
+const DEFAULT_SMOKE_PATH = path.resolve(process.cwd(), "outputs", "smoke", "latest.json");
+const DEFAULT_OUTPUT_PATH = path.resolve(process.cwd(), "outputs", "reports", "staging-report.md");
+
+export async function generateStagingReport({
+  logPath = DEFAULT_LOG_PATH,
+  smokePath = DEFAULT_SMOKE_PATH,
+  outputPath = DEFAULT_OUTPUT_PATH,
+} = {}) {
+  const [summary, classification, smoke] = await Promise.all([
+    summarizeRunHistory({ logPath }),
+    classifyRunHistory({ logPath }),
+    readJSONIfExists(smokePath),
+  ]);
+  const markdown = renderReport({ summary, classification, smoke, generatedAt: new Date().toISOString() });
+  await fs.mkdir(path.dirname(outputPath), { recursive: true });
+  await fs.writeFile(outputPath, markdown, "utf8");
+  return { outputPath, summary, classification, smokePresent: Boolean(smoke) };
+}
+
+export function renderReport({ summary, classification, smoke, generatedAt }) {
+  const lines = [
+    "# Staging Observation Report",
+    "",
+    `Generated: ${generatedAt}`,
+    "",
+    "## Run Summary",
+    "",
+    `- Total runs: ${summary.totalRuns}`,
+    `- Success count: ${summary.successCount}`,
+    `- Failure count: ${summary.failureCount}`,
+    `- Validation pass rate: ${formatPercent(summary.validationPassRate)}`,
+    `- Average duration: ${summary.averageDurationMs} ms`,
+    `- P95 duration: ${summary.p95DurationMs} ms`,
+    "",
+    "### Runs By Route",
+    "",
+    ...mapCounts(summary.runsByRoute),
+    "",
+    "### Runs By Part Type",
+    "",
+    ...mapCounts(summary.runsByPartType),
+    "",
+    "## Failure Classification",
+    "",
+    `- Failure runs: ${classification.failureRuns}`,
+    `- Expected failures: ${classification.expectedFailureCount}`,
+    `- Unexpected failures: ${classification.unexpectedFailureCount}`,
+    "",
+    "### Expected By Reason",
+    "",
+    ...mapCounts(classification.expectedByReason),
+    "",
+    "### Unexpected By Reason",
+    "",
+    ...mapCounts(classification.unexpectedByReason),
+    "",
+    "### Recent Unexpected Failures",
+    "",
+    ...recentUnexpectedLines(classification.recentUnexpectedFailures),
+    "",
+    "## Latest Smoke",
+    "",
+    ...smokeLines(smoke),
+    "",
+  ];
+  return `${lines.join("\n")}\n`;
+}
+
+async function readJSONIfExists(filePath) {
+  try {
+    return JSON.parse(await fs.readFile(filePath, "utf8"));
+  } catch (error) {
+    if (error?.code === "ENOENT") return undefined;
+    throw error;
+  }
+}
+
+function mapCounts(counts) {
+  const entries = Object.entries(counts || {});
+  if (!entries.length) return ["- none"];
+  return entries.map(([key, value]) => `- ${key}: ${value}`);
+}
+
+function recentUnexpectedLines(items) {
+  if (!items?.length) return ["- none"];
+  return items.map((item) =>
+    `- ${item.timestamp || "unknown"} | ${item.route || "unknown"} | ${item.reason || item.errorCode || "UNKNOWN"} | ${item.partType || "unknown"} | ${item.durationMs ?? "n/a"} ms`,
+  );
+}
+
+function smokeLines(smoke) {
+  if (!smoke) return ["- No smoke output found. Run `npm run smoke:staging -- --output outputs/smoke/latest.json`."];
+  return [
+    `- OK: ${Boolean(smoke.ok)}`,
+    `- Duration: ${smoke.durationMs ?? "n/a"} ms`,
+    `- HTTPS configured: ${Boolean(smoke.health?.httpsConfigured)}`,
+    `- Warning: ${smoke.health?.warning || "none"}`,
+    `- Rev001: ${smoke.rev001?.id || "missing"} | validation ${Boolean(smoke.rev001?.validationPassed)}`,
+    `- Rev002: ${smoke.rev002?.id || "missing"} | validation ${Boolean(smoke.rev002?.validationPassed)}`,
+    `- Artifact downloads: ${smoke.artifactDownloads?.length ?? 0}`,
+  ];
+}
+
+function formatPercent(value) {
+  return `${Math.round(Number(value || 0) * 100)}%`;
+}
+
+function parseArgs(argv) {
+  const args = {
+    logPath: DEFAULT_LOG_PATH,
+    smokePath: DEFAULT_SMOKE_PATH,
+    outputPath: DEFAULT_OUTPUT_PATH,
+  };
+  for (let index = 0; index < argv.length; index += 1) {
+    if (argv[index] === "--log") {
+      args.logPath = path.resolve(argv[index + 1]);
+      index += 1;
+    } else if (argv[index] === "--smoke") {
+      args.smokePath = path.resolve(argv[index + 1]);
+      index += 1;
+    } else if (argv[index] === "--output") {
+      args.outputPath = path.resolve(argv[index + 1]);
+      index += 1;
+    }
+  }
+  return args;
+}
+
+function isMain() {
+  return process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+}
+
+if (isMain()) {
+  generateStagingReport(parseArgs(process.argv.slice(2)))
+    .then((result) => {
+      console.log(JSON.stringify({ output: result.outputPath, smokePresent: result.smokePresent }, null, 2));
+    })
+    .catch((error) => {
+      console.error(error instanceof Error ? error.message : String(error));
+      process.exitCode = 1;
+    });
+}

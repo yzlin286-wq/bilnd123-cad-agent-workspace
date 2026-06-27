@@ -4,7 +4,7 @@ AI CAD Agent workspace built with Next.js, React, Three.js, and build123d.
 
 The product surface is intentionally user-facing: users start with natural language, then watch an agent workstream create an engineering spec, run the CAD kernel, validate geometry, and expose real artifacts for preview and download.
 
-Current stage: `v0.6 staging hardening`.
+Current stage: `v0.7 observation hardening`.
 
 ## Product Shape
 
@@ -112,8 +112,10 @@ npm run typecheck
 npm test
 npm run build
 npm run cleanup:cad
+npm run runs:classify
 npm run runs:summary
 npm run failures:export
+npm run staging:report
 ```
 
 CI runs `npm ci`, lint, typecheck, unit tests, production build, and Python build123d smoke tests for both `mounting_plate` and `l_bracket`. The runner smoke also checks `package.zip`.
@@ -138,10 +140,18 @@ Legacy diagnostic endpoints may remain for development, but the user-facing app 
 
 - Deployment guide: `docs/STAGING_DEPLOYMENT.md`
 - HTTPS guide: `docs/HTTPS_STAGING.md`
+- Failure triage guide: `docs/FAILURE_TRIAGE.md`
 - Operations guide: `docs/OPERATIONS.md`
 - 48-72 hour test protocol: `docs/STAGING_TEST_PROTOCOL.md`
 - Docker compose file: `docker-compose.staging.yml`
 - HTTPS compose example: `docker-compose.staging.https.yml`
-- Manual smoke: `npm run smoke:staging`
+- Manual smoke: `npm run smoke:staging -- --output outputs/smoke/latest.json`
 
 Staging must be protected with Basic Auth and is not suitable for public anonymous traffic. Basic Auth should not be used long-term over plaintext HTTP; use HTTPS, a private tunnel, Tailscale, or IP allowlist before broader internal testing.
+
+Observation tools:
+
+- `npm run runs:summary`: aggregate run counts, duration, validation pass rate, routes, and part types
+- `npm run runs:classify`: split failures into expected and unexpected categories
+- `npm run failures:export`: write a sanitized failure corpus for triage
+- `npm run staging:report`: generate a local sanitized report at `outputs/reports/staging-report.md`

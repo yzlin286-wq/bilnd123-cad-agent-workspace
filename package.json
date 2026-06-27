@@ -9,8 +9,10 @@
     "failures:export": "node scripts/export-failures.mjs",
     "start": "next start",
     "lint": "eslint .",
+    "runs:classify": "node scripts/classify-runs.mjs",
     "runs:summary": "node scripts/summarize-runs.mjs",
     "smoke:staging": "node scripts/staging-smoke.mjs",
+    "staging:report": "node scripts/staging-report.mjs",
     "test": "tsx --test tests/**/*.test.ts",
     "typecheck": "tsc --noEmit"
   },

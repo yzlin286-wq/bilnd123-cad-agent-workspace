@@ -24,6 +24,24 @@ async function loadExportModule() {
   };
 }
 
+async function loadClassifyModule() {
+  const moduleUrl = pathToFileURL(path.resolve("scripts", "classify-runs.mjs")).href;
+  return (await import(moduleUrl)) as {
+    classifyRuns: (runs: Record<string, unknown>[]) => Record<string, unknown>;
+  };
+}
+
+async function loadReportModule() {
+  const moduleUrl = pathToFileURL(path.resolve("scripts", "staging-report.mjs")).href;
+  return (await import(moduleUrl)) as {
+    generateStagingReport: (options: {
+      logPath: string;
+      smokePath: string;
+      outputPath: string;
+    }) => Promise<{ outputPath: string; smokePresent: boolean }>;
+  };
+}
+
 test("summarizeRuns reports counts, duration, routes, part types, and failures", async () => {
   const { summarizeRuns } = await loadSummaryModule();
 
@@ -105,6 +123,87 @@ test("exportFailures writes sanitized failure corpus without full prompts", asyn
   assert.match(String(written.failures[0].prompt), /\[redacted\]/);
   assert.equal(String(written.failures[0].prompt).includes("very long trailing prompt"), false);
   assert.equal(sanitizePrompt("Bearer abc.def", 80), "Bearer [redacted]");
+
+  await fs.rm(tempRoot, { recursive: true, force: true });
+});
+
+test("classifyRuns separates expected and unexpected failures", async () => {
+  const { classifyRuns } = await loadClassifyModule();
+
+  const classification = classifyRuns([
+    { status: "failure", statusCode: 401, route: "/api/health" },
+    { status: "failure", errorCode: "RATE_LIMITED", route: "/api/agent/run" },
+    { status: "failure", errorCode: "UNSUPPORTED_PART_TYPE", route: "/api/agent/run" },
+    { status: "failure", errorCode: "PARAMETER_CONFLICT", route: "/api/cad/rebuild" },
+    { status: "failure", errorCode: "LLM_JSON_ERROR", route: "/api/agent/run", prompt: "bad json" },
+    { status: "success", validationPassed: false, route: "/api/cad/rebuild", revisionId: "rev-bad" },
+  ]);
+
+  assert.equal(classification.expectedFailureCount, 4);
+  assert.equal(classification.unexpectedFailureCount, 2);
+  assert.deepEqual(classification.expectedByReason, {
+    AUTH_REQUIRED: 1,
+    RATE_LIMITED: 1,
+    UNSUPPORTED_PART_TYPE: 1,
+    PARAMETER_CONFLICT: 1,
+  });
+  assert.deepEqual(classification.unexpectedByReason, {
+    LLM_JSON_ERROR: 1,
+    VALIDATION_FAILED: 1,
+  });
+  assert.equal(Array.isArray(classification.recentUnexpectedFailures), true);
+});
+
+test("staging report writes sanitized markdown without prompts", async () => {
+  const { generateStagingReport } = await loadReportModule();
+  const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "staging-report-"));
+  const logPath = path.join(tempRoot, "runs.jsonl");
+  const smokePath = path.join(tempRoot, "latest.json");
+  const outputPath = path.join(tempRoot, "staging-report.md");
+
+  await fs.writeFile(
+    logPath,
+    [
+      JSON.stringify({
+        timestamp: "2026-06-27T00:00:00.000Z",
+        route: "/api/agent/run",
+        status: "failure",
+        errorCode: "LLM_JSON_ERROR",
+        durationMs: 123,
+        prompt: "do not include this full prompt",
+      }),
+      JSON.stringify({
+        timestamp: "2026-06-27T00:00:01.000Z",
+        route: "/api/agent/run",
+        status: "success",
+        durationMs: 456,
+        validationPassed: true,
+        partType: "mounting_plate",
+      }),
+    ].join("\n"),
+    "utf8",
+  );
+  await fs.writeFile(
+    smokePath,
+    JSON.stringify({
+      ok: true,
+      durationMs: 999,
+      health: { httpsConfigured: false, warning: "Staging is running without HTTPS domain; restrict access." },
+      rev001: { id: "rev001", validationPassed: true },
+      rev002: { id: "rev002", validationPassed: true },
+      artifactDownloads: [{ kind: "package" }],
+    }),
+    "utf8",
+  );
+
+  const result = await generateStagingReport({ logPath, smokePath, outputPath });
+  const markdown = await fs.readFile(result.outputPath, "utf8");
+
+  assert.equal(result.smokePresent, true);
+  assert.match(markdown, /Staging Observation Report/);
+  assert.match(markdown, /Unexpected failures: 1/);
+  assert.match(markdown, /Rev002: rev002/);
+  assert.equal(markdown.includes("do not include this full prompt"), false);
 
   await fs.rm(tempRoot, { recursive: true, force: true });
 });

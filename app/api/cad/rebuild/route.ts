@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { runCADKernel, CADRunnerNotConfiguredError } from "@/lib/cad/cad-runner-client";
 import { enforcePromptLimit, enforceRateLimit } from "@/lib/server/request-guards";
+import { operationalErrorCode } from "@/lib/server/failure-codes";
 import { appendRunHistory } from "@/lib/server/run-history";
 import type { EngineeringSpec } from "@/lib/agent/spec";
 
@@ -62,17 +63,18 @@ export async function POST(request: Request) {
         { status: 503 },
       );
     }
+    const errorCode = operationalErrorCode(error, "CAD_REBUILD_FAILED");
     await appendRunHistory({
       route: "/api/cad/rebuild",
       runId,
       prompt: body.prompt,
       status: "failure",
       durationMs: performance.now() - startedAt,
-      errorCode: "CAD_REBUILD_FAILED",
+      errorCode,
     });
     return Response.json(
       {
-        error: "CAD_REBUILD_FAILED",
+        error: errorCode,
         userMessage: userFacingCADRebuildError(error),
         detail: error instanceof Error ? error.message : "Unknown error.",
       },

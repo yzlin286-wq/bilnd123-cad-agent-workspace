@@ -1,10 +1,16 @@
 #!/usr/bin/env node
+import { promises as fs } from "node:fs";
+import path from "node:path";
+import { listZipEntries } from "./zip-entries.mjs";
 
 const baseUrl = requiredEnv("STAGING_BASE_URL").replace(/\/$/, "");
 const authHeader = basicAuthHeader();
+const args = parseArgs(process.argv.slice(2));
+const startedAt = Date.now();
 
 const initialPrompt = "Make a 120 x 80 x 4 mm mounting plate with four 4.5 mm holes, 10 mm edge offset, and 1 mm chamfer";
 const revisionPrompt = "change thickness to 6 mm";
+const requiredPackageEntries = ["model.step", "model.stl", "drawing.svg", "source.py", "spec.json", "validation.json", "manifest.json"];
 
 const health = await getJSON("/api/health");
 assert(health.app === "ok", "health app check failed");
@@ -32,32 +38,77 @@ for (const key of ["length", "width", "holeDiameter", "edgeOffset", "chamfer"]) 
   );
 }
 
+const artifactDownloads = [];
 for (const kind of ["step", "stl", "validation", "package"]) {
   const artifact = rev002.artifacts.find((item) => item.kind === kind);
   assert(artifact, `missing ${kind} artifact`);
   const response = await fetchURL(artifact.url);
   assert(response.status === 200, `${kind} download returned ${response.status}`);
-  const bytes = new Uint8Array(await response.arrayBuffer()).byteLength;
-  assert(bytes > 0, `${kind} download was empty`);
+  const body = Buffer.from(await response.arrayBuffer());
+  assert(body.byteLength > 0, `${kind} download was empty`);
+  const download = {
+    kind,
+    name: artifact.name,
+    url: artifact.url,
+    status: response.status,
+    bytes: body.byteLength,
+  };
+  if (kind === "package") {
+    const entries = listZipEntries(body);
+    for (const requiredEntry of requiredPackageEntries) {
+      assert(entries.includes(requiredEntry), `package.zip missing ${requiredEntry}`);
+    }
+    download.zipEntries = entries;
+  }
+  artifactDownloads.push(download);
 }
 
-console.log(
-  JSON.stringify(
-    {
-      ok: true,
-      health: {
-        cadRunnerConfigured: health.cadRunnerConfigured,
-        llmConfigured: health.llmConfigured,
-        outputDirWritable: health.outputDirWritable,
-      },
-      rev001: rev001.id,
-      rev002: rev002.id,
-      artifactCount: rev002.artifacts.length,
+const result = {
+  ok: true,
+  durationMs: Date.now() - startedAt,
+  health: {
+    cadRunnerConfigured: health.cadRunnerConfigured,
+    llmConfigured: health.llmConfigured,
+    outputDirWritable: health.outputDirWritable,
+    httpsConfigured: health.httpsConfigured,
+    warning: health.warning,
+  },
+  rev001: revisionSummary(rev001),
+  rev002: revisionSummary(rev002),
+  artifactDownloads,
+};
+
+if (args.outputPath) {
+  await fs.mkdir(path.dirname(args.outputPath), { recursive: true });
+  await fs.writeFile(args.outputPath, `${JSON.stringify(result, null, 2)}\n`, "utf8");
+}
+
+console.log(JSON.stringify(result, null, 2));
+
+function revisionSummary(revision) {
+  return {
+    id: revision.id,
+    validationPassed: Boolean(revision.validation?.passed),
+    artifactCount: revision.artifacts.length,
+    artifacts: revision.artifacts.map((artifact) => ({
+      kind: artifact.kind,
+      name: artifact.name,
+      url: artifact.url,
+      bytes: artifact.bytes,
+    })),
+    spec: {
+      partType: revision.engineeringSpec.partType,
+      length: revision.engineeringSpec.length,
+      height: revision.engineeringSpec.height,
+      width: revision.engineeringSpec.width,
+      thickness: revision.engineeringSpec.thickness,
+      holeDiameter: revision.engineeringSpec.holeDiameter,
+      edgeOffset: revision.engineeringSpec.edgeOffset,
+      chamfer: revision.engineeringSpec.chamfer,
+      units: revision.engineeringSpec.units,
     },
-    null,
-    2,
-  ),
-);
+  };
+}
 
 async function getJSON(path) {
   const response = await fetchURL(path);
@@ -118,4 +169,15 @@ function assert(condition, message) {
   if (!condition) {
     throw new Error(message);
   }
+}
+
+function parseArgs(argv) {
+  const parsed = {};
+  for (let index = 0; index < argv.length; index += 1) {
+    if (argv[index] === "--output") {
+      parsed.outputPath = path.resolve(argv[index + 1]);
+      index += 1;
+    }
+  }
+  return parsed;
 }

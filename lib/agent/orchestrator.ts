@@ -5,6 +5,7 @@ import { runCADKernel, CADRunnerNotConfiguredError } from "@/lib/cad/cad-runner-
 import { findArtifact } from "@/lib/cad/artifacts";
 import { mergeRevisionSpec, normalizeSpec } from "@/lib/agent/spec-merge";
 import { callSpecRevisionPlanner, callWorkstreamPlanner, repairJSONCandidate } from "@/lib/server/openai-compatible";
+import { operationalErrorCode } from "@/lib/server/failure-codes";
 import { getRuntimeConfig, isLLMConfigured } from "@/lib/server/runtime";
 import { appendRunHistory, type RunHistoryRoute } from "@/lib/server/run-history";
 
@@ -98,9 +99,10 @@ export async function runAgentOrchestration(prompt: string, emit: Emit, route: R
       return;
     }
 
+    const errorCode = operationalErrorCode(error, "AGENT_RUN_FAILED");
     await emit({
       type: "error",
-      code: "AGENT_RUN_FAILED",
+      code: errorCode,
       message: error instanceof Error ? error.message : "Unknown agent failure.",
       userMessage: userFacingRunError(error, "The CAD agent could not finish this revision. Review the prompt or engine connection and try again."),
     });
@@ -111,7 +113,7 @@ export async function runAgentOrchestration(prompt: string, emit: Emit, route: R
       model,
       status: "failure",
       durationMs: performance.now() - startedAt,
-      errorCode: "AGENT_RUN_FAILED",
+      errorCode,
     });
   }
 }
@@ -214,9 +216,10 @@ export async function runRevisionOrchestration({
       return;
     }
 
+    const errorCode = operationalErrorCode(error, "REVISION_FAILED");
     await emit({
       type: "error",
-      code: "REVISION_FAILED",
+      code: errorCode,
       message: error instanceof Error ? error.message : "Unknown revision failure.",
       userMessage: userFacingRunError(error, "The CAD agent could not revise this model. Check the instruction and try again."),
     });
@@ -227,7 +230,7 @@ export async function runRevisionOrchestration({
       model,
       status: "failure",
       durationMs: performance.now() - startedAt,
-      errorCode: "REVISION_FAILED",
+      errorCode,
     });
   }
 }

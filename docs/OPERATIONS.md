@@ -235,6 +235,12 @@ Summarize run history:
 npm run runs:summary
 ```
 
+Classify failures:
+
+```bash
+npm run runs:classify
+```
+
 Export sanitized failure samples:
 
 ```bash
@@ -248,6 +254,20 @@ outputs/failures/failures.json
 ```
 
 It includes only sanitized prompt, route, errorCode, partType, durationMs, and timestamp. It must not include API keys, Basic Auth values, full stderr, cookies, or server filesystem paths.
+
+Generate a local admin-safe report:
+
+```bash
+npm run staging:report
+```
+
+The report is written to:
+
+```text
+outputs/reports/staging-report.md
+```
+
+It aggregates run summary, failure classification, and the latest smoke result without including full prompts or secrets.
 
 ## Artifact Download Auth
 

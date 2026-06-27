@@ -11,6 +11,11 @@ export async function GET() {
   const outputDirWritable = await canWriteOutputDir();
   const cadRunnerConfigured = isCADRunnerConfigured();
   const llmConfigured = isLLMConfigured();
+  const httpsConfigured = Boolean(process.env.STAGING_DOMAIN?.trim());
+  const warning =
+    process.env.NODE_ENV === "production" && !httpsConfigured
+      ? "Staging is running without HTTPS domain; restrict access."
+      : undefined;
 
   return Response.json({
     ok: outputDirWritable,
@@ -18,6 +23,8 @@ export async function GET() {
     cadRunnerConfigured,
     llmConfigured,
     outputDirWritable,
+    httpsConfigured,
+    warning,
     supportedTemplates,
   });
 }

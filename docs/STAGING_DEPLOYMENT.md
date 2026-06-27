@@ -100,10 +100,10 @@ After deployment:
 STAGING_BASE_URL=http://server.example.com:12601 \
 STAGING_BASIC_AUTH_USER=... \
 STAGING_BASIC_AUTH_PASSWORD=... \
-npm run smoke:staging
+npm run smoke:staging -- --output outputs/smoke/latest.json
 ```
 
-The smoke script checks `/api/health`, creates a `mounting_plate`, revises thickness to `6 mm`, verifies unchanged dimensions, and downloads generated artifacts including `package.zip`.
+The smoke script checks `/api/health`, creates a `mounting_plate`, revises thickness to `6 mm`, verifies unchanged dimensions, downloads generated artifacts including `package.zip`, and verifies the ZIP file contains the expected CAD files.
 
 ## Logs
 
@@ -121,10 +121,22 @@ Summarize runs:
 npm run runs:summary
 ```
 
+Classify expected and unexpected failures:
+
+```bash
+npm run runs:classify
+```
+
 Export sanitized failure samples:
 
 ```bash
 npm run failures:export
+```
+
+Generate a local staging report:
+
+```bash
+npm run staging:report
 ```
 
 ## Cleanup
