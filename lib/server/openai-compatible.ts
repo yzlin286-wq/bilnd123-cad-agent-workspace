@@ -34,15 +34,17 @@ const ENGINEERING_SPEC_SCHEMA: JSONSchema = {
         additionalProperties: false,
         properties: {
           length: { type: "number" },
+          height: { type: "number" },
           width: { type: "number" },
           thickness: { type: "number" },
           holeDiameter: { type: "number" },
           edgeOffset: { type: "number" },
           chamfer: { type: "number" },
           material: { type: "string" },
+          partType: { type: "string", enum: ["mounting_plate", "l_bracket"] },
           units: { type: "string" },
         },
-        required: ["length", "width", "thickness", "holeDiameter", "edgeOffset", "chamfer", "material", "units"],
+        required: ["partType", "length", "width", "thickness", "holeDiameter", "edgeOffset", "chamfer", "material", "units"],
       },
     },
     required: ["engineeringSpec"],
@@ -60,12 +62,14 @@ const SPEC_REVISION_SCHEMA: JSONSchema = {
         additionalProperties: false,
         properties: {
           length: { type: "number" },
+          height: { type: "number" },
           width: { type: "number" },
           thickness: { type: "number" },
           holeDiameter: { type: "number" },
           edgeOffset: { type: "number" },
           chamfer: { type: "number" },
           material: { type: "string" },
+          partType: { type: "string", enum: ["mounting_plate", "l_bracket"] },
           units: { type: "string" },
         },
       },
@@ -74,18 +78,20 @@ const SPEC_REVISION_SCHEMA: JSONSchema = {
         additionalProperties: false,
         properties: {
           length: { type: "number" },
+          height: { type: "number" },
           width: { type: "number" },
           thickness: { type: "number" },
           holeDiameter: { type: "number" },
           edgeOffset: { type: "number" },
           chamfer: { type: "number" },
           material: { type: "string" },
+          partType: { type: "string", enum: ["mounting_plate", "l_bracket"] },
           units: { type: "string" },
         },
-        required: ["length", "width", "thickness", "holeDiameter", "edgeOffset", "chamfer", "material", "units"],
+        required: ["partType", "length", "width", "thickness", "holeDiameter", "edgeOffset", "chamfer", "material", "units"],
       },
     },
-    required: ["engineeringSpec"],
+    anyOf: [{ required: ["specDelta"] }, { required: ["engineeringSpec"] }],
   },
 };
 
@@ -112,7 +118,7 @@ export async function callWorkstreamPlanner({
         model,
         config,
         systemPrompt:
-          "You are a CAD agent planner. Return only JSON with an engineeringSpec object. Required engineeringSpec fields: length, width, thickness, holeDiameter, edgeOffset, chamfer, material, units. Use millimeters unless the user explicitly asks otherwise. Do not generate fallback CAD code.",
+          "You are a CAD agent planner. Return only JSON with an engineeringSpec object. Supported partType values are mounting_plate and l_bracket. Required engineeringSpec fields: partType, length, width, thickness, holeDiameter, edgeOffset, chamfer, material, units. For l_bracket also include height. Use millimeters unless the user explicitly asks otherwise. Do not generate fallback CAD code.",
         jsonSchema: ENGINEERING_SPEC_SCHEMA,
       });
       if (!content.trim()) {
@@ -148,7 +154,7 @@ export async function callSpecRevisionPlanner({
       currentSpec,
       userPrompt,
       instruction:
-        "Revise the existing CAD spec. Preserve every unchanged field from currentSpec. Return an updated engineeringSpec plus an optional specDelta. Do not treat the userPrompt as a brand new model.",
+        "Revise the existing CAD spec. Preserve every unchanged field from currentSpec. Prefer returning only specDelta with changed fields. engineeringSpec may be included for validation only. Do not treat the userPrompt as a brand new model.",
     },
     null,
     2,
@@ -165,7 +171,7 @@ export async function callSpecRevisionPlanner({
         model,
         config,
         systemPrompt:
-          "You revise an existing build123d mounting plate engineering spec. Return JSON only. Preserve unchanged dimensions, holeDiameter, edgeOffset, chamfer, material, and units. Never reinterpret a revision instruction as a new part request.",
+          "You revise an existing build123d engineering spec for supported partType values mounting_plate and l_bracket. Return JSON only. Prefer a specDelta containing only changed fields. Preserve unchanged partType, dimensions, holeDiameter, edgeOffset, chamfer, material, and units. Never reinterpret a revision instruction as a new part request.",
         jsonSchema: SPEC_REVISION_SCHEMA,
       });
       if (!content.trim()) {

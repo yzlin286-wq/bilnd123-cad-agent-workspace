@@ -6,7 +6,7 @@ import { ArrowUp, ImagePlus, Sparkles } from "lucide-react";
 const examples = [
   "Make a 120 x 80 x 4 mm mounting plate with four M4 holes",
   "Create a 90 x 60 x 5 mm mounting plate with 6 mm holes and 8 mm edge offset",
-  "Make a 140 x 90 x 6 mm aluminum plate with four M5 holes and 1.5 mm chamfer",
+  "Create an 80 x 60 x 40 mm L bracket, 5 mm thick, with 5 mm mounting holes",
 ];
 
 export function HeroComposer({ onGenerate }: { onGenerate: (prompt: string) => void }) {
@@ -35,9 +35,9 @@ export function HeroComposer({ onGenerate }: { onGenerate: (prompt: string) => v
             placeholder="Describe a part..."
           />
           <div className="composer-row">
-            <button className="soft-action" type="button">
+            <button className="soft-action" type="button" disabled title="Coming soon">
               <ImagePlus size={16} />
-              Upload sketch
+              Upload sketch: Coming soon
             </button>
             <button className="generate-button" onClick={() => onGenerate(prompt.trim())} disabled={!prompt.trim()}>
               Generate

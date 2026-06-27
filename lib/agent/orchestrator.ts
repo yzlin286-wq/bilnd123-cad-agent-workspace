@@ -3,6 +3,7 @@ import { AgentEvent } from "@/lib/agent/events";
 import { EngineeringSpec } from "@/lib/agent/spec";
 import { runCADKernel, CADRunnerNotConfiguredError } from "@/lib/cad/cad-runner-client";
 import { findArtifact } from "@/lib/cad/artifacts";
+import { mergeRevisionSpec, normalizeSpec } from "@/lib/agent/spec-merge";
 import { callSpecRevisionPlanner, callWorkstreamPlanner, repairJSONCandidate } from "@/lib/server/openai-compatible";
 import { getRuntimeConfig, isLLMConfigured } from "@/lib/server/runtime";
 
@@ -70,7 +71,7 @@ export async function runAgentOrchestration(prompt: string, emit: Emit) {
       type: "error",
       code: "AGENT_RUN_FAILED",
       message: error instanceof Error ? error.message : "Unknown agent failure.",
-      userMessage: "The CAD agent could not finish this revision. Review the prompt or engine connection and try again.",
+      userMessage: userFacingRunError(error, "The CAD agent could not finish this revision. Review the prompt or engine connection and try again."),
     });
   }
 }
@@ -145,9 +146,17 @@ export async function runRevisionOrchestration({
       type: "error",
       code: "REVISION_FAILED",
       message: error instanceof Error ? error.message : "Unknown revision failure.",
-      userMessage: "The CAD agent could not revise this model. Check the instruction and try again.",
+      userMessage: userFacingRunError(error, "The CAD agent could not revise this model. Check the instruction and try again."),
     });
   }
+}
+
+function userFacingRunError(error: unknown, fallback: string) {
+  const message = error instanceof Error ? error.message : "";
+  if (message.includes("Unsupported partType")) {
+    return message;
+  }
+  return fallback;
 }
 
 async function createEngineeringSpec(prompt: string): Promise<EngineeringSpec> {
@@ -179,9 +188,11 @@ async function reviseEngineeringSpec({
     config: getRuntimeConfig(),
   });
   const payload = extractJSON(result.content);
-  const specDelta = isRecord(payload.specDelta) ? payload.specDelta : {};
-  const rawSpec = isRecord(payload.engineeringSpec) ? payload.engineeringSpec : {};
-  return normalizeSpec({ ...currentSpec, ...specDelta, ...rawSpec });
+  return mergeRevisionSpec({
+    currentSpec,
+    specDelta: payload.specDelta,
+    engineeringSpec: payload.engineeringSpec,
+  });
 }
 
 function extractJSON(content: string) {
@@ -192,29 +203,8 @@ function extractJSON(content: string) {
   return JSON.parse(candidate) as Record<string, unknown>;
 }
 
-function normalizeSpec(raw: Record<string, unknown>): EngineeringSpec {
-  return {
-    length: number(raw.length, "length"),
-    width: number(raw.width, "width"),
-    thickness: number(raw.thickness, "thickness"),
-    holeDiameter: number(raw.holeDiameter ?? raw.hole_diameter ?? raw.holeDia, "holeDiameter"),
-    edgeOffset: number(raw.edgeOffset ?? raw.edge_offset, "edgeOffset"),
-    chamfer: number(raw.chamfer ?? 0, "chamfer"),
-    material: String(raw.material ?? "Aluminum 6061"),
-    units: String(raw.units ?? "mm"),
-  };
-}
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
-}
-
-function number(value: unknown, field: string) {
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed)) {
-    throw new Error(`Engineering spec is missing numeric ${field}.`);
-  }
-  return parsed;
 }
 
 function emitStep(

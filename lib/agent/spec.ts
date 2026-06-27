@@ -8,7 +8,9 @@ export type WorkstreamStep = {
 };
 
 export type EngineeringSpec = {
+  partType: "mounting_plate" | "l_bracket" | string;
   length: number;
+  height?: number;
   width: number;
   thickness: number;
   holeDiameter: number;

@@ -31,10 +31,18 @@ export async function POST(request: Request) {
     return Response.json(
       {
         error: "CAD_REBUILD_FAILED",
-        userMessage: "The CAD engine could not rebuild this revision.",
+        userMessage: userFacingCADRebuildError(error),
         detail: error instanceof Error ? error.message : "Unknown error.",
       },
       { status: 500 },
     );
   }
+}
+
+function userFacingCADRebuildError(error: unknown) {
+  const message = error instanceof Error ? error.message : "";
+  if (message.includes("Unsupported partType")) {
+    return message;
+  }
+  return "The CAD engine could not rebuild this revision.";
 }

@@ -29,6 +29,9 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      - name: Unit tests
+        run: npm test
+
       - name: Build
         run: npm run build
 
@@ -51,16 +54,22 @@ jobs:
 
       - name: Run CAD runner smoke test
         run: |
-          echo '{"spec":{"length":120,"width":80,"thickness":4,"holeDiameter":4.5,"edgeOffset":10,"chamfer":1}}' | python scripts/run_build123d.py | tee runner-output.json
+          echo '{"spec":{"partType":"mounting_plate","length":120,"width":80,"thickness":4,"holeDiameter":4.5,"edgeOffset":10,"chamfer":1}}' | python scripts/run_build123d.py | tee runner-output-mounting-plate.json
+          echo '{"spec":{"partType":"l_bracket","length":80,"height":60,"width":40,"thickness":5,"holeDiameter":5,"edgeOffset":10,"chamfer":1}}' | python scripts/run_build123d.py | tee runner-output-l-bracket.json
           python - <<'PY'
           import json
           from pathlib import Path
 
-          payload = json.loads(Path("runner-output.json").read_text())
-          assert payload["ok"], payload
-          validation_path = Path(payload["artifacts"]["validation"])
-          validation = json.loads(validation_path.read_text())
-          assert validation["passed"], validation
-          assert Path(payload["artifacts"]["step"]).stat().st_size > 0
-          assert Path(payload["artifacts"]["stl"]).stat().st_size > 0
+          for output_name, part_type in [
+              ("runner-output-mounting-plate.json", "mounting_plate"),
+              ("runner-output-l-bracket.json", "l_bracket"),
+          ]:
+              payload = json.loads(Path(output_name).read_text())
+              assert payload["ok"], payload
+              validation_path = Path(payload["artifacts"]["validation"])
+              validation = json.loads(validation_path.read_text())
+              assert validation["passed"], validation
+              assert validation["metrics"]["partType"] == part_type
+              assert Path(payload["artifacts"]["step"]).stat().st_size > 0
+              assert Path(payload["artifacts"]["stl"]).stat().st_size > 0
           PY

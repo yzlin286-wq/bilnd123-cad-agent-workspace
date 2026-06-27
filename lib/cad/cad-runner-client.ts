@@ -38,7 +38,8 @@ export async function runCADKernel({
   });
 
   if (result.exitCode !== 0) {
-    throw new Error(result.stderr || `CAD runner exited with ${result.exitCode}`);
+    const runnerError = parseRunnerError(result.stderr);
+    throw new Error(runnerError || `CAD runner exited with ${result.exitCode}`);
   }
 
   const payload = parseRunnerStdout(result.stdout);
@@ -93,4 +94,19 @@ function parseRunnerStdout(stdout: string) {
     throw new Error("CAD runner produced no JSON output.");
   }
   return JSON.parse(lastLine) as CADRunnerStdout;
+}
+
+function parseRunnerError(stderr: string) {
+  const lastLine = stderr
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .at(-1);
+  if (!lastLine) return "";
+  try {
+    const payload = JSON.parse(lastLine) as CADRunnerStdout;
+    return payload.error ?? lastLine;
+  } catch {
+    return lastLine;
+  }
 }

@@ -1,6 +1,6 @@
 # Build123d CAD Agent
 
-Adam/CADAM-like AI CAD Agent workspace built with Next.js, React, Three.js, and build123d.
+AI CAD Agent workspace built with Next.js, React, Three.js, and build123d.
 
 The product surface is intentionally user-facing: users start with natural language, then watch an agent workstream create an engineering spec, run the CAD kernel, validate geometry, and expose real artifacts for preview and download.
 
@@ -10,7 +10,9 @@ The product surface is intentionally user-facing: users start with natural langu
 - Workspace: narrow history rail, ChatGPT-like agent thread, and CAD artifact canvas
 - Workstream: understanding request, engineering spec, build123d source, CAD kernel, STEP export, preview mesh, validation, packaging
 - CAD Canvas tabs: Preview, Drawing, Parameters, Files
-- No user-facing runtime/debug controls
+- No user-facing internal control panels
+- Supported CAD templates: `mounting_plate` and `l_bracket`
+- Upload sketch: visible as `Coming soon`, disabled until image-to-CAD is implemented
 
 ## No Fallback Policy
 
@@ -24,6 +26,11 @@ This project must not fabricate CAD or agent results.
 - If build123d is unavailable, the runner exits non-zero and no fake artifacts are produced.
 
 ## Real CAD Artifacts
+
+The runner currently supports:
+
+- `mounting_plate`: length, width, thickness, holeDiameter, edgeOffset, chamfer
+- `l_bracket`: length, height, width, thickness, holeDiameter, edgeOffset, chamfer
 
 The build123d runner writes real files under `outputs/cad/<revision>/`:
 
@@ -45,6 +52,7 @@ The build123d runner writes real files under `outputs/cad/<revision>/`:
 - cylindrical hole-face count
 - hole radius measurement
 - exported file sizes
+- partType check
 
 ## Stack
 
@@ -81,8 +89,11 @@ npm install
 npm run dev
 npm run lint
 npm run typecheck
+npm test
 npm run build
 ```
+
+CI runs `npm ci`, lint, typecheck, unit tests, production build, and Python build123d smoke tests for both `mounting_plate` and `l_bracket`.
 
 Local development URL:
 
@@ -93,6 +104,7 @@ http://127.0.0.1:3000
 ## Main APIs
 
 - `POST /api/agent/run`: SSE agent orchestration endpoint
+- `POST /api/agent/revise`: SSE revision endpoint that applies `currentSpec + specDelta` by default
 - `POST /api/cad/rebuild`: rebuilds a revision from an explicit parameter/spec payload
 - `GET /api/artifacts/[id]`: streams generated artifacts from local output storage
 

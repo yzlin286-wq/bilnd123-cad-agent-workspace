@@ -38,6 +38,14 @@ const emptyWorkspace = (): WorkspaceState => ({
   running: false,
 });
 
+const REBUILD_WORKSTREAM_TEMPLATE: WorkstreamStep[] = [
+  { id: "parameters", label: "Updating parameters", status: "pending" },
+  { id: "kernel", label: "Running CAD kernel", status: "pending" },
+  { id: "step", label: "Exporting STEP", status: "pending" },
+  { id: "validation", label: "Validating geometry", status: "pending" },
+  { id: "package", label: "Packaging files", status: "pending" },
+];
+
 export function CADAgentWorkspace() {
   const [hasStarted, setHasStarted] = useState(false);
   const [workspace, setWorkspace] = useState<WorkspaceState>(() => emptyWorkspace());
@@ -114,7 +122,7 @@ export function CADAgentWorkspace() {
   async function rebuildFromParameters(spec: EngineeringSpec) {
     const nextRevisionCount = workspace.revisionCount + 1;
     const userMessage = userThreadMessage("Updated parameters from the panel.");
-    const agentMessage = agentThreadMessage(formatRevision(nextRevisionCount));
+    const agentMessage = agentThreadMessage(formatRevision(nextRevisionCount), cloneRebuildSteps());
     setWorkspace((current) => ({
       ...current,
       messages: [...current.messages, userMessage, agentMessage],
@@ -122,6 +130,15 @@ export function CADAgentWorkspace() {
       revisionCount: nextRevisionCount,
       running: true,
     }));
+    setWorkspace((current) =>
+      updateActiveAgent(current, {
+        steps: updateStep(
+          updateStep(currentActiveSteps(current), "parameters", "done"),
+          "kernel",
+          "running",
+        ),
+      }),
+    );
 
     try {
       const response = await fetch("/api/cad/rebuild", {
@@ -140,7 +157,21 @@ export function CADAgentWorkspace() {
         );
         return;
       }
-      setWorkspace((current) => applyRevision(current, data.revision as CADRevision));
+      const revision = data.revision;
+      setWorkspace((current) =>
+        updateActiveAgent(current, {
+          steps: updateStep(
+            updateStep(
+              updateStep(currentActiveSteps(current), "kernel", "done"),
+              "step",
+              "done",
+            ),
+            "validation",
+            revision.validation?.passed ? "done" : "failed",
+          ),
+        }),
+      );
+      setWorkspace((current) => applyRevision(current, revision));
     } catch {
       setWorkspace((current) =>
         updateActiveAgent(current, {
@@ -286,12 +317,12 @@ function userThreadMessage(content: string): ThreadMessage {
   return { id: crypto.randomUUID(), role: "user", content };
 }
 
-function agentThreadMessage(revisionLabel: string): ThreadMessage {
+function agentThreadMessage(revisionLabel: string, steps = cloneSteps()): ThreadMessage {
   return {
     id: crypto.randomUUID(),
     role: "agent",
     revisionLabel,
-    steps: cloneSteps(),
+    steps,
     artifacts: [],
     running: true,
   };
@@ -299,6 +330,10 @@ function agentThreadMessage(revisionLabel: string): ThreadMessage {
 
 function cloneSteps() {
   return WORKSTREAM_TEMPLATE.map((step) => ({ ...step }));
+}
+
+function cloneRebuildSteps() {
+  return REBUILD_WORKSTREAM_TEMPLATE.map((step) => ({ ...step }));
 }
 
 function formatRevision(index: number) {

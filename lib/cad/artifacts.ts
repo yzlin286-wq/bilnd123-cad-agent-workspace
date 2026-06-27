@@ -65,15 +65,20 @@ export function contentTypeFor(filePath: string) {
 }
 
 export async function revisionFromManifest(manifestPath: string, prompt?: string): Promise<CADRevision> {
-  const manifest = JSON.parse(await fs.readFile(manifestPath, "utf8")) as RunnerManifest;
-  const validationArtifact = manifest.artifacts.find((item) => item.kind === "validation");
+  const safeManifestPath = ensureInsideOutputRoot(path.resolve(manifestPath));
+  const manifest = JSON.parse(await fs.readFile(safeManifestPath, "utf8")) as RunnerManifest;
+  const safeArtifactPaths = manifest.artifacts.map((item) => ({
+    ...item,
+    path: ensureInsideOutputRoot(path.resolve(item.path)),
+  }));
+  const validationArtifact = safeArtifactPaths.find((item) => item.kind === "validation");
   const validation = validationArtifact
-    ? ((JSON.parse(await fs.readFile(path.resolve(validationArtifact.path), "utf8")) as ValidationReport) ?? undefined)
+    ? ((JSON.parse(await fs.readFile(validationArtifact.path, "utf8")) as ValidationReport) ?? undefined)
     : undefined;
   const artifacts = await Promise.all(
-    manifest.artifacts.map((item) => fileToArtifact(item.kind, item.label, path.resolve(item.path))),
+    safeArtifactPaths.map((item) => fileToArtifact(item.kind, item.label, item.path)),
   );
-  artifacts.push(await fileToArtifact("manifest", "Run manifest", manifestPath));
+  artifacts.push(await fileToArtifact("manifest", "Run manifest", safeManifestPath));
 
   return {
     id: manifest.revisionId,
@@ -90,7 +95,7 @@ export function findArtifact(artifacts: CADArtifact[], kind: CADArtifactKind) {
   return artifacts.find((artifact) => artifact.kind === kind);
 }
 
-function ensureInsideOutputRoot(absolutePath: string) {
+export function ensureInsideOutputRoot(absolutePath: string) {
   const relative = path.relative(CAD_OUTPUT_ROOT, absolutePath);
   if (relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative))) {
     return absolutePath;

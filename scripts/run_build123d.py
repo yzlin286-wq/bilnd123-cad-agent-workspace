@@ -1,4 +1,4 @@
-"""Run a real build123d mounting-plate job from JSON stdin.
+"""Run a real build123d CAD template job from JSON stdin.
 
 This runner intentionally has no local fallback. If build123d or Open Cascade is
 not available, it exits non-zero instead of fabricating CAD artifacts.
@@ -82,8 +82,10 @@ def main() -> int:
 
 
 def normalize_spec(raw: dict[str, Any]) -> dict[str, Any]:
-    return {
+    spec = {
+        "partType": str(raw.get("partType", raw.get("part_type", "mounting_plate"))),
         "length": number(raw.get("length", 120), "length"),
+        "height": number(raw.get("height", 60), "height") if raw.get("height") is not None else None,
         "width": number(raw.get("width", 80), "width"),
         "thickness": number(raw.get("thickness", 4), "thickness"),
         "holeDiameter": number(raw.get("holeDiameter", raw.get("hole_dia", 4.5)), "holeDiameter"),
@@ -92,6 +94,9 @@ def normalize_spec(raw: dict[str, Any]) -> dict[str, Any]:
         "material": str(raw.get("material", "Aluminum 6061")),
         "units": str(raw.get("units", "mm")),
     }
+    if spec["height"] is None and spec["partType"] != "l_bracket":
+        del spec["height"]
+    return spec
 
 
 def number(value: Any, field: str) -> float:
@@ -105,22 +110,32 @@ def number(value: Any, field: str) -> float:
 
 
 def validate_spec(spec: dict[str, Any]) -> None:
+    part_type = spec["partType"]
     length = spec["length"]
     width = spec["width"]
+    height = spec.get("height")
     thickness = spec["thickness"]
     hole_dia = spec["holeDiameter"]
     edge = spec["edgeOffset"]
     chamfer = spec["chamfer"]
 
+    if part_type not in {"mounting_plate", "l_bracket"}:
+        raise ValueError(f"Unsupported partType '{part_type}'. Supported partType values: mounting_plate, l_bracket")
     if min(length, width, thickness, hole_dia) <= 0:
         raise ValueError("length, width, thickness, and holeDiameter must be positive")
+    if part_type == "l_bracket" and (height is None or height <= 0):
+        raise ValueError("height must be positive for l_bracket")
     if edge <= hole_dia / 2:
         raise ValueError("edgeOffset must be larger than the hole radius")
-    if edge * 2 >= min(length, width):
+    if part_type == "mounting_plate" and edge * 2 >= min(length, width):
         raise ValueError("edgeOffset leaves no usable area for the hole pattern")
+    if part_type == "l_bracket" and (edge * 2 >= min(length, width) or edge >= height):
+        raise ValueError("edgeOffset leaves no usable area for the l_bracket hole pattern")
     if chamfer < 0:
         raise ValueError("chamfer must be zero or positive")
-    if chamfer >= min(thickness / 2, length / 2, width / 2):
+    if part_type == "mounting_plate" and chamfer >= min(thickness / 2, length / 2, width / 2):
+        raise ValueError("chamfer is too large for the part dimensions")
+    if part_type == "l_bracket" and chamfer >= min(thickness / 2, length / 2, width / 2, height / 2):
         raise ValueError("chamfer is too large for the part dimensions")
 
 
@@ -132,6 +147,14 @@ def make_run_dir(output_dir: Any) -> Path:
 
 
 def run_build123d(spec: dict[str, Any], run_dir: Path) -> dict[str, Any]:
+    if spec["partType"] == "mounting_plate":
+        return build_mounting_plate(spec, run_dir)
+    if spec["partType"] == "l_bracket":
+        return build_l_bracket(spec, run_dir)
+    raise ValueError(f"Unsupported partType '{spec['partType']}'. Supported partType values: mounting_plate, l_bracket")
+
+
+def build_mounting_plate(spec: dict[str, Any], run_dir: Path) -> dict[str, Any]:
     try:
         from build123d import (
             Axis,
@@ -183,6 +206,7 @@ def run_build123d(spec: dict[str, Any], run_dir: Path) -> dict[str, Any]:
     reloaded_bbox = reloaded.bounding_box()
 
     metrics = {
+        "partType": "mounting_plate",
         "bbox": vector_to_dict(bbox.size),
         "bboxMin": vector_to_dict(bbox.min),
         "bboxMax": vector_to_dict(bbox.max),
@@ -202,7 +226,89 @@ def run_build123d(spec: dict[str, Any], run_dir: Path) -> dict[str, Any]:
     return {"artifacts": {"step": step_path, "stl": stl_path}, "metrics": metrics}
 
 
+def build_l_bracket(spec: dict[str, Any], run_dir: Path) -> dict[str, Any]:
+    try:
+        from build123d import (
+            Axis,
+            Box,
+            BuildPart,
+            GeomType,
+            Hole,
+            Locations,
+            chamfer,
+            export_step,
+            export_stl,
+            import_step,
+        )
+    except Exception as exc:  # pragma: no cover - depends on local CAD install
+        raise RuntimeError(
+            "build123d is not installed or cannot load Open Cascade. Install requirements.txt and retry."
+        ) from exc
+
+    length = spec["length"]
+    height = spec["height"]
+    width = spec["width"]
+    thickness = spec["thickness"]
+    hole_dia = spec["holeDiameter"]
+    edge = spec["edgeOffset"]
+    chamfer_length = spec["chamfer"]
+
+    with BuildPart() as bracket:
+        with Locations((0, length / 2, thickness / 2)):
+            Box(width, length, thickness)
+        with Locations((0, thickness / 2, height / 2)):
+            Box(width, thickness, height)
+        with Locations(
+            (-width / 2 + edge, edge, 0),
+            (width / 2 - edge, edge, 0),
+            (-width / 2 + edge, length - edge, 0),
+            (width / 2 - edge, length - edge, 0),
+        ):
+            Hole(hole_dia / 2)
+        if chamfer_length:
+            chamfer(bracket.edges().filter_by(Axis.X), length=chamfer_length)
+
+    step_path = run_dir / "model.step"
+    stl_path = run_dir / "model.stl"
+    export_step(bracket.part, str(step_path))
+    export_stl(bracket.part, str(stl_path))
+
+    bbox = bracket.part.bounding_box()
+    cyl_faces = bracket.part.faces().filter_by(GeomType.CYLINDER)
+    cylinder_radii = sorted(round(face.radius, 6) for face in cyl_faces)
+    hole_radius = round(hole_dia / 2, 6)
+    hole_cylinder_radii = [radius for radius in cylinder_radii if abs(radius - hole_radius) < 0.001]
+    reloaded = import_step(str(step_path))
+    reloaded_bbox = reloaded.bounding_box()
+
+    metrics = {
+        "partType": "l_bracket",
+        "bbox": vector_to_dict(bbox.size),
+        "bboxMin": vector_to_dict(bbox.min),
+        "bboxMax": vector_to_dict(bbox.max),
+        "stepReloadedBbox": vector_to_dict(reloaded_bbox.size),
+        "solidCount": len(bracket.part.solids()),
+        "faceCount": len(bracket.part.faces()),
+        "edgeCount": len(bracket.part.edges()),
+        "cylindricalFaceCount": len(cyl_faces),
+        "cylinderRadii": cylinder_radii,
+        "holeCylindricalFaceCount": len(hole_cylinder_radii),
+        "holeCylinderRadii": hole_cylinder_radii,
+        "chamferLength": chamfer_length,
+        "chamferOperator": "chamfer",
+        "stepBytes": step_path.stat().st_size,
+        "stlBytes": stl_path.stat().st_size,
+    }
+    return {"artifacts": {"step": step_path, "stl": stl_path}, "metrics": metrics}
+
+
 def write_svg_drawing(spec: dict[str, Any], path: Path) -> Path:
+    if spec["partType"] == "l_bracket":
+        return write_l_bracket_svg(spec, path)
+    return write_mounting_plate_svg(spec, path)
+
+
+def write_mounting_plate_svg(spec: dict[str, Any], path: Path) -> Path:
     length = spec["length"]
     width = spec["width"]
     hole_dia = spec["holeDiameter"]
@@ -235,14 +341,50 @@ def write_svg_drawing(spec: dict[str, Any], path: Path) -> Path:
     return path
 
 
+def write_l_bracket_svg(spec: dict[str, Any], path: Path) -> Path:
+    length = spec["length"]
+    height = spec["height"]
+    width = spec["width"]
+    thickness = spec["thickness"]
+    hole_dia = spec["holeDiameter"]
+    edge = spec["edgeOffset"]
+    scale = min(420 / length, 230 / height)
+    base_w = length * scale
+    upright_h = height * scale
+    wall_t = max(thickness * scale, 4)
+    x0 = 70
+    y0 = 285
+    hole_r = hole_dia * scale / 2
+    holes = [
+        (x0 + edge * scale, y0 - wall_t / 2),
+        (x0 + (length - edge) * scale, y0 - wall_t / 2),
+    ]
+    circles = "\n".join(
+        f'<circle cx="{x:.2f}" cy="{y:.2f}" r="{hole_r:.2f}" fill="none" stroke="#0f172a" stroke-width="2" />'
+        for x, y in holes
+    )
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 360">
+  <rect x="20" y="20" width="520" height="320" fill="#f8fafc" stroke="#1f2937" stroke-width="2" />
+  <path d="M {x0:.2f} {y0:.2f} L {x0 + base_w:.2f} {y0:.2f} L {x0 + base_w:.2f} {y0 - wall_t:.2f} L {x0 + wall_t:.2f} {y0 - wall_t:.2f} L {x0 + wall_t:.2f} {y0 - upright_h:.2f} L {x0:.2f} {y0 - upright_h:.2f} Z" fill="none" stroke="#0f172a" stroke-width="3" />
+  {circles}
+  <text x="34" y="314" fill="#0f172a" font-family="Inter, Arial" font-size="13">L bracket | width {width:g} {spec["units"]} | {spec["material"]}</text>
+  <text x="350" y="314" fill="#0f172a" font-family="Inter, Arial" font-size="13">{length:g} x {height:g} x {thickness:g}</text>
+</svg>
+"""
+    path.write_text(svg, encoding="utf-8")
+    return path
+
+
 def write_validation(spec: dict[str, Any], metrics: dict[str, Any], path: Path) -> Path:
+    expected_bbox = expected_bbox_for(spec)
     checks = [
-        check("bbox_x", spec["length"], metrics["bbox"]["x"]),
-        check("bbox_y", spec["width"], metrics["bbox"]["y"]),
-        check("bbox_z", spec["thickness"], metrics["bbox"]["z"]),
-        check("step_reload_bbox_x", spec["length"], metrics["stepReloadedBbox"]["x"]),
-        check("step_reload_bbox_y", spec["width"], metrics["stepReloadedBbox"]["y"]),
-        check("step_reload_bbox_z", spec["thickness"], metrics["stepReloadedBbox"]["z"]),
+        text_check("part_type", spec["partType"], metrics["partType"]),
+        check("bbox_x", expected_bbox["x"], metrics["bbox"]["x"]),
+        check("bbox_y", expected_bbox["y"], metrics["bbox"]["y"]),
+        check("bbox_z", expected_bbox["z"], metrics["bbox"]["z"]),
+        check("step_reload_bbox_x", expected_bbox["x"], metrics["stepReloadedBbox"]["x"]),
+        check("step_reload_bbox_y", expected_bbox["y"], metrics["stepReloadedBbox"]["y"]),
+        check("step_reload_bbox_z", expected_bbox["z"], metrics["stepReloadedBbox"]["z"]),
         check("solid_count", 1, metrics["solidCount"]),
         check("hole_cylindrical_face_count", 4, metrics["holeCylindricalFaceCount"]),
         check("hole_radius", spec["holeDiameter"] / 2, min(metrics["holeCylinderRadii"] or [0])),
@@ -263,6 +405,12 @@ def write_validation(spec: dict[str, Any], metrics: dict[str, Any], path: Path) 
         encoding="utf-8",
     )
     return path
+
+
+def expected_bbox_for(spec: dict[str, Any]) -> dict[str, float]:
+    if spec["partType"] == "l_bracket":
+        return {"x": spec["width"], "y": spec["length"], "z": spec["height"]}
+    return {"x": spec["length"], "y": spec["width"], "z": spec["thickness"]}
 
 
 def check(name: str, expected: float, actual: float) -> dict[str, Any]:
@@ -302,14 +450,7 @@ def write_manifest(
         "revisionId": path.parent.name,
         "createdAt": iso_now(),
         "engineeringSpec": spec,
-        "parameterManifest": [
-            parameter("length", "Length", spec["length"], "mm", 20, 240),
-            parameter("width", "Width", spec["width"], "mm", 20, 200),
-            parameter("thickness", "Thickness", spec["thickness"], "mm", 1, 20),
-            parameter("holeDiameter", "Hole diameter", spec["holeDiameter"], "mm", 2, 16),
-            parameter("edgeOffset", "Edge offset", spec["edgeOffset"], "mm", 3, 40),
-            parameter("chamfer", "Chamfer", spec["chamfer"], "mm", 0, 6),
-        ],
+        "parameterManifest": parameter_manifest_for(spec),
         "artifacts": [
             artifact("step", "STEP", artifacts["step"]),
             artifact("stl", "Preview mesh", artifacts["stl"]),
@@ -322,6 +463,24 @@ def write_manifest(
     }
     path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
     return path
+
+
+def parameter_manifest_for(spec: dict[str, Any]) -> list[dict[str, Any]]:
+    items = [
+        parameter("length", "Length", spec["length"], "mm", 20, 240),
+    ]
+    if spec["partType"] == "l_bracket":
+        items.append(parameter("height", "Height", spec["height"], "mm", 20, 180))
+    items.extend(
+        [
+            parameter("width", "Width", spec["width"], "mm", 20, 200),
+            parameter("thickness", "Thickness", spec["thickness"], "mm", 1, 20),
+            parameter("holeDiameter", "Hole diameter", spec["holeDiameter"], "mm", 2, 16),
+            parameter("edgeOffset", "Edge offset", spec["edgeOffset"], "mm", 3, 40),
+            parameter("chamfer", "Chamfer", spec["chamfer"], "mm", 0, 6),
+        ]
+    )
+    return items
 
 
 def parameter(
@@ -357,6 +516,12 @@ def vector_to_dict(vector: Any) -> dict[str, float]:
 
 
 def render_source(spec: dict[str, Any]) -> str:
+    if spec["partType"] == "l_bracket":
+        return render_l_bracket_source(spec)
+    return render_mounting_plate_source(spec)
+
+
+def render_mounting_plate_source(spec: dict[str, Any]) -> str:
     return f"""from build123d import *
 
 length = {spec["length"]:g}
@@ -379,6 +544,36 @@ with BuildPart() as plate:
         chamfer(plate.edges().filter_by(Axis.Z), length=chamfer_length)
 
 export_step(plate.part, "model.step")
+"""
+
+
+def render_l_bracket_source(spec: dict[str, Any]) -> str:
+    return f"""from build123d import *
+
+length = {spec["length"]:g}
+height = {spec["height"]:g}
+width = {spec["width"]:g}
+thickness = {spec["thickness"]:g}
+hole_dia = {spec["holeDiameter"]:g}
+edge_offset = {spec["edgeOffset"]:g}
+chamfer_length = {spec["chamfer"]:g}
+
+with BuildPart() as bracket:
+    with Locations((0, length / 2, thickness / 2)):
+        Box(width, length, thickness)
+    with Locations((0, thickness / 2, height / 2)):
+        Box(width, thickness, height)
+    with Locations(
+        (-width / 2 + edge_offset, edge_offset, 0),
+        ( width / 2 - edge_offset, edge_offset, 0),
+        (-width / 2 + edge_offset, length - edge_offset, 0),
+        ( width / 2 - edge_offset, length - edge_offset, 0),
+    ):
+        Hole(hole_dia / 2)
+    if chamfer_length:
+        chamfer(bracket.edges().filter_by(Axis.X), length=chamfer_length)
+
+export_step(bracket.part, "model.step")
 """
 
 
