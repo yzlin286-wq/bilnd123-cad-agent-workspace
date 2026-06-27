@@ -3,7 +3,7 @@ import { AgentEvent } from "@/lib/agent/events";
 import { EngineeringSpec } from "@/lib/agent/spec";
 import { runCADKernel, CADRunnerNotConfiguredError } from "@/lib/cad/cad-runner-client";
 import { findArtifact } from "@/lib/cad/artifacts";
-import { callWorkstreamPlanner } from "@/lib/server/openai-compatible";
+import { callSpecRevisionPlanner, callWorkstreamPlanner, repairJSONCandidate } from "@/lib/server/openai-compatible";
 import { getRuntimeConfig, isLLMConfigured } from "@/lib/server/runtime";
 
 type Emit = (event: AgentEvent) => void | Promise<void>;
@@ -75,6 +75,81 @@ export async function runAgentOrchestration(prompt: string, emit: Emit) {
   }
 }
 
+export async function runRevisionOrchestration({
+  currentSpec,
+  currentRevisionId,
+  userPrompt,
+  emit,
+}: {
+  currentSpec: EngineeringSpec;
+  currentRevisionId: string;
+  userPrompt: string;
+  emit: Emit;
+}) {
+  const runId = randomUUID();
+  await emit({ type: "run.started", runId, prompt: userPrompt });
+  await emitStep(emit, "understand", "Understanding revision", "running");
+
+  if (!isLLMConfigured()) {
+    await emitStep(emit, "understand", "Understanding revision", "failed", "Connect a real AI model to revise the current CAD spec.");
+    await emit({
+      type: "error",
+      code: "AI_ENGINE_NOT_CONNECTED",
+      message: "Real LLM runtime is not configured.",
+      userMessage: "AI CAD engine not connected. Add your model endpoint before revising this model.",
+    });
+    return;
+  }
+
+  try {
+    const spec = await reviseEngineeringSpec({ currentSpec, currentRevisionId, userPrompt });
+    await emitStep(emit, "understand", "Understanding revision", "done");
+    await emitStep(emit, "spec", "Updating engineering spec", "done", `${spec.length} x ${spec.width} x ${spec.thickness} ${spec.units}`);
+    await emit({ type: "spec", spec });
+
+    await emitStep(emit, "source", "Updating build123d model", "running");
+    await emitStep(emit, "source", "Updating build123d model", "done");
+    await emitStep(emit, "kernel", "Running CAD kernel", "running");
+    const revision = await runCADKernel({ spec, prompt: userPrompt });
+    await emitStep(emit, "kernel", "Running CAD kernel", "done");
+    await emitStep(emit, "step", "Exporting STEP", "done");
+    await emitStep(emit, "preview", "Rendering preview mesh", "done");
+    await emitStep(emit, "validation", "Validating geometry", revision.validation?.passed ? "done" : "failed");
+    await emitStep(emit, "package", "Packaging files", "done");
+
+    for (const artifact of revision.artifacts) {
+      await emit({ type: "artifact", artifact });
+    }
+    const preview = findArtifact(revision.artifacts, "stl");
+    if (preview) {
+      await emit({ type: "preview", artifact: preview });
+    }
+    if (revision.validation) {
+      await emit({ type: "validation", validation: revision.validation });
+    }
+    await emit({ type: "revision", revision });
+    await emit({ type: "run.completed", revision });
+  } catch (error) {
+    if (error instanceof CADRunnerNotConfiguredError) {
+      await emitStep(emit, "kernel", "Running CAD kernel", "failed", "The CAD engine is not connected.");
+      await emit({
+        type: "error",
+        code: "CAD_ENGINE_NOT_CONNECTED",
+        message: error.message,
+        userMessage: "CAD engine not connected. Connect build123d before rebuilding this revision.",
+      });
+      return;
+    }
+
+    await emit({
+      type: "error",
+      code: "REVISION_FAILED",
+      message: error instanceof Error ? error.message : "Unknown revision failure.",
+      userMessage: "The CAD agent could not revise this model. Check the instruction and try again.",
+    });
+  }
+}
+
 async function createEngineeringSpec(prompt: string): Promise<EngineeringSpec> {
   const result = await callWorkstreamPlanner({
     prompt,
@@ -88,15 +163,33 @@ async function createEngineeringSpec(prompt: string): Promise<EngineeringSpec> {
   return normalizeSpec(raw);
 }
 
+async function reviseEngineeringSpec({
+  currentSpec,
+  currentRevisionId,
+  userPrompt,
+}: {
+  currentSpec: EngineeringSpec;
+  currentRevisionId: string;
+  userPrompt: string;
+}) {
+  const result = await callSpecRevisionPlanner({
+    currentSpec,
+    currentRevisionId,
+    userPrompt,
+    config: getRuntimeConfig(),
+  });
+  const payload = extractJSON(result.content);
+  const specDelta = isRecord(payload.specDelta) ? payload.specDelta : {};
+  const rawSpec = isRecord(payload.engineeringSpec) ? payload.engineeringSpec : {};
+  return normalizeSpec({ ...currentSpec, ...specDelta, ...rawSpec });
+}
+
 function extractJSON(content: string) {
-  const fenced = content.match(/```(?:json)?\s*([\s\S]*?)```/i)?.[1];
-  const candidate = fenced ?? content;
-  const firstBrace = candidate.indexOf("{");
-  const lastBrace = candidate.lastIndexOf("}");
-  if (firstBrace < 0 || lastBrace <= firstBrace) {
+  const candidate = repairJSONCandidate(content);
+  if (!candidate.startsWith("{")) {
     throw new Error("AI model did not return JSON engineering spec.");
   }
-  return JSON.parse(candidate.slice(firstBrace, lastBrace + 1)) as Record<string, unknown>;
+  return JSON.parse(candidate) as Record<string, unknown>;
 }
 
 function normalizeSpec(raw: Record<string, unknown>): EngineeringSpec {

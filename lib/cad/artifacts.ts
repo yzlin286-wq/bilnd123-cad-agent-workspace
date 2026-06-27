@@ -2,7 +2,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import type { CADArtifact, CADArtifactKind, CADRevision, EngineeringSpec, ParameterManifestItem, ValidationReport } from "@/lib/agent/spec";
 
-export const CAD_OUTPUT_ROOT = path.join(process.cwd(), "outputs", "cad");
+export const CAD_OUTPUT_ROOT = path.resolve(process.cwd(), "outputs", "cad");
 
 type RunnerManifestArtifact = {
   kind: CADArtifactKind;
@@ -31,17 +31,15 @@ const MIME_BY_EXT: Record<string, string> = {
 };
 
 export function artifactIdFromPath(filePath: string) {
-  const relative = path.relative(CAD_OUTPUT_ROOT, path.resolve(filePath)).replaceAll(path.sep, "/");
+  const absolute = ensureInsideOutputRoot(path.resolve(filePath));
+  const relative = path.relative(CAD_OUTPUT_ROOT, absolute).replaceAll(path.sep, "/");
   return Buffer.from(relative, "utf8").toString("base64url");
 }
 
 export function resolveArtifactPath(id: string) {
   const relative = Buffer.from(id, "base64url").toString("utf8");
   const absolute = path.resolve(CAD_OUTPUT_ROOT, relative);
-  if (!absolute.startsWith(path.resolve(CAD_OUTPUT_ROOT))) {
-    throw new Error("Artifact path escapes output root.");
-  }
-  return absolute;
+  return ensureInsideOutputRoot(absolute);
 }
 
 export function artifactUrl(id: string) {
@@ -90,4 +88,12 @@ export async function revisionFromManifest(manifestPath: string, prompt?: string
 
 export function findArtifact(artifacts: CADArtifact[], kind: CADArtifactKind) {
   return artifacts.find((artifact) => artifact.kind === kind);
+}
+
+function ensureInsideOutputRoot(absolutePath: string) {
+  const relative = path.relative(CAD_OUTPUT_ROOT, absolutePath);
+  if (relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative))) {
+    return absolutePath;
+  }
+  throw new Error("Artifact path escapes output root.");
 }

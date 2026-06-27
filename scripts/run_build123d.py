@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import math
 import sys
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -125,7 +126,7 @@ def validate_spec(spec: dict[str, Any]) -> None:
 
 def make_run_dir(output_dir: Any) -> Path:
     base = Path(str(output_dir)) if output_dir else Path("outputs") / "cad"
-    run_dir = base / datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    run_dir = base / f"{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}-{uuid.uuid4().hex[:8]}"
     run_dir.mkdir(parents=True, exist_ok=True)
     return run_dir
 
@@ -139,9 +140,9 @@ def run_build123d(spec: dict[str, Any], run_dir: Path) -> dict[str, Any]:
             GeomType,
             Hole,
             Locations,
+            chamfer,
             export_step,
             export_stl,
-            fillet,
             import_step,
         )
     except Exception as exc:  # pragma: no cover - depends on local CAD install
@@ -154,7 +155,7 @@ def run_build123d(spec: dict[str, Any], run_dir: Path) -> dict[str, Any]:
     thickness = spec["thickness"]
     hole_dia = spec["holeDiameter"]
     edge = spec["edgeOffset"]
-    chamfer = spec["chamfer"]
+    chamfer_length = spec["chamfer"]
 
     with BuildPart() as plate:
         Box(length, width, thickness)
@@ -165,8 +166,8 @@ def run_build123d(spec: dict[str, Any], run_dir: Path) -> dict[str, Any]:
             (length / 2 - edge, width / 2 - edge, 0),
         ):
             Hole(hole_dia / 2)
-        if chamfer:
-            fillet(plate.edges().filter_by(Axis.Z), radius=chamfer)
+        if chamfer_length:
+            chamfer(plate.edges().filter_by(Axis.Z), length=chamfer_length)
 
     step_path = run_dir / "model.step"
     stl_path = run_dir / "model.stl"
@@ -193,6 +194,8 @@ def run_build123d(spec: dict[str, Any], run_dir: Path) -> dict[str, Any]:
         "cylinderRadii": cylinder_radii,
         "holeCylindricalFaceCount": len(hole_cylinder_radii),
         "holeCylinderRadii": hole_cylinder_radii,
+        "chamferLength": chamfer_length,
+        "chamferOperator": "chamfer",
         "stepBytes": step_path.stat().st_size,
         "stlBytes": stl_path.stat().st_size,
     }
@@ -243,6 +246,8 @@ def write_validation(spec: dict[str, Any], metrics: dict[str, Any], path: Path) 
         check("solid_count", 1, metrics["solidCount"]),
         check("hole_cylindrical_face_count", 4, metrics["holeCylindricalFaceCount"]),
         check("hole_radius", spec["holeDiameter"] / 2, min(metrics["holeCylinderRadii"] or [0])),
+        text_check("chamfer_operator", "chamfer", metrics["chamferOperator"]),
+        check("chamfer_length", spec["chamfer"], metrics["chamferLength"]),
         min_file_size_check("step_file", metrics["stepBytes"]),
         min_file_size_check("stl_file", metrics["stlBytes"]),
     ]
@@ -275,6 +280,15 @@ def min_file_size_check(name: str, actual: int) -> dict[str, Any]:
         "expected": "> 0 bytes",
         "actual": actual,
         "passed": actual > 0,
+    }
+
+
+def text_check(name: str, expected: str, actual: str) -> dict[str, Any]:
+    return {
+        "name": name,
+        "expected": expected,
+        "actual": actual,
+        "passed": expected == actual,
     }
 
 
@@ -350,7 +364,7 @@ width = {spec["width"]:g}
 thickness = {spec["thickness"]:g}
 hole_dia = {spec["holeDiameter"]:g}
 edge_offset = {spec["edgeOffset"]:g}
-chamfer = {spec["chamfer"]:g}
+chamfer_length = {spec["chamfer"]:g}
 
 with BuildPart() as plate:
     Box(length, width, thickness)
@@ -361,8 +375,8 @@ with BuildPart() as plate:
         ( length / 2 - edge_offset,  width / 2 - edge_offset, 0),
     ):
         Hole(hole_dia / 2)
-    if chamfer:
-        fillet(plate.edges().filter_by(Axis.Z), radius=chamfer)
+    if chamfer_length:
+        chamfer(plate.edges().filter_by(Axis.Z), length=chamfer_length)
 
 export_step(plate.part, "model.step")
 """

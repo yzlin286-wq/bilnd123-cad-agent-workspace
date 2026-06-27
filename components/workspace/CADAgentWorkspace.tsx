@@ -1,16 +1,25 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { Sparkles } from "lucide-react";
 import { HeroComposer } from "@/components/landing/HeroComposer";
-import { AgentThread } from "@/components/agent/AgentThread";
+import { AgentThread, type ThreadMessage } from "@/components/agent/AgentThread";
 import { CADArtifactCanvas } from "@/components/cad/CADArtifactCanvas";
-import { WORKSTREAM_TEMPLATE, type CADArtifact, type CADRevision, type EngineeringSpec, type ParameterManifestItem, type ValidationReport, type WorkstreamStep } from "@/lib/agent/spec";
+import {
+  WORKSTREAM_TEMPLATE,
+  type CADArtifact,
+  type CADRevision,
+  type EngineeringSpec,
+  type ParameterManifestItem,
+  type ValidationReport,
+  type WorkstreamStep,
+} from "@/lib/agent/spec";
 import type { AgentEvent } from "@/lib/agent/events";
 
 type WorkspaceState = {
-  prompt: string;
-  steps: WorkstreamStep[];
+  messages: ThreadMessage[];
+  activeAgentId?: string;
+  revisionCount: number;
   artifacts: CADArtifact[];
   preview?: CADArtifact;
   drawing?: CADArtifact;
@@ -18,13 +27,12 @@ type WorkspaceState = {
   revision?: CADRevision;
   spec?: EngineeringSpec;
   parameters: ParameterManifestItem[];
-  error?: string;
   running: boolean;
 };
 
-const emptyWorkspace = (prompt = ""): WorkspaceState => ({
-  prompt,
-  steps: WORKSTREAM_TEMPLATE,
+const emptyWorkspace = (): WorkspaceState => ({
+  messages: [],
+  revisionCount: 0,
   artifacts: [],
   parameters: [],
   running: false,
@@ -34,28 +42,59 @@ export function CADAgentWorkspace() {
   const [hasStarted, setHasStarted] = useState(false);
   const [workspace, setWorkspace] = useState<WorkspaceState>(() => emptyWorkspace());
 
-  const visiblePrompt = useMemo(
-    () => workspace.prompt || "Describe the CAD part you want to create.",
-    [workspace.prompt],
-  );
-
   async function runPrompt(prompt: string) {
     setHasStarted(true);
-    setWorkspace({ ...emptyWorkspace(prompt), running: true });
+    const userMessage = userThreadMessage(prompt);
+    const agentMessage = agentThreadMessage("Rev 001");
+    setWorkspace({
+      ...emptyWorkspace(),
+      messages: [userMessage, agentMessage],
+      activeAgentId: agentMessage.id,
+      revisionCount: 1,
+      running: true,
+    });
+    await consumeAgentEndpoint("/api/agent/run", { prompt });
+  }
 
+  async function revisePrompt(userPrompt: string) {
+    if (!workspace.spec || !workspace.revision) {
+      await runPrompt(userPrompt);
+      return;
+    }
+
+    const nextRevisionCount = workspace.revisionCount + 1;
+    const userMessage = userThreadMessage(userPrompt);
+    const agentMessage = agentThreadMessage(formatRevision(nextRevisionCount));
+    setWorkspace((current) => ({
+      ...current,
+      messages: [...current.messages, userMessage, agentMessage],
+      activeAgentId: agentMessage.id,
+      revisionCount: nextRevisionCount,
+      running: true,
+    }));
+
+    await consumeAgentEndpoint("/api/agent/revise", {
+      currentSpec: workspace.spec,
+      currentRevisionId: workspace.revision.id,
+      userPrompt,
+    });
+  }
+
+  async function consumeAgentEndpoint(endpoint: string, body: unknown) {
     try {
-      const response = await fetch("/api/agent/run", {
+      const response = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt }),
+        body: JSON.stringify(body),
       });
 
       if (!response.ok || !response.body) {
-        setWorkspace((current) => ({
-          ...current,
-          running: false,
-          error: "The CAD agent could not start. Please try again.",
-        }));
+        setWorkspace((current) =>
+          updateActiveAgent(current, {
+            running: false,
+            error: "The CAD agent could not start. Please try again.",
+          }),
+        );
         return;
       }
 
@@ -63,46 +102,53 @@ export function CADAgentWorkspace() {
         setWorkspace((current) => reduceEvent(current, event));
       });
     } catch {
-      setWorkspace((current) => ({
-        ...current,
-        running: false,
-        error: "Connection interrupted while generating your CAD model.",
-      }));
+      setWorkspace((current) =>
+        updateActiveAgent(current, {
+          running: false,
+          error: "Connection interrupted while generating your CAD model.",
+        }),
+      );
     }
   }
 
   async function rebuildFromParameters(spec: EngineeringSpec) {
+    const nextRevisionCount = workspace.revisionCount + 1;
+    const userMessage = userThreadMessage("Updated parameters from the panel.");
+    const agentMessage = agentThreadMessage(formatRevision(nextRevisionCount));
     setWorkspace((current) => ({
       ...current,
+      messages: [...current.messages, userMessage, agentMessage],
+      activeAgentId: agentMessage.id,
+      revisionCount: nextRevisionCount,
       running: true,
-      error: undefined,
-      steps: updateStep(current.steps, "kernel", "running", "Rebuilding with updated parameters."),
     }));
+
     try {
       const response = await fetch("/api/cad/rebuild", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ spec, prompt: workspace.prompt }),
+        body: JSON.stringify({ spec, prompt: "parameter rebuild" }),
       });
       const data = (await response.json()) as { revision?: CADRevision; userMessage?: string };
       if (!response.ok || !data.revision) {
-        setWorkspace((current) => ({
-          ...current,
-          running: false,
-          error: data.userMessage ?? "The CAD engine could not rebuild this revision.",
-          steps: updateStep(current.steps, "kernel", "failed"),
-        }));
+        setWorkspace((current) =>
+          updateActiveAgent(current, {
+            running: false,
+            error: data.userMessage ?? "The CAD engine could not rebuild this revision.",
+            steps: updateStep(currentActiveSteps(current), "kernel", "failed"),
+          }),
+        );
         return;
       }
-      const revision = data.revision;
-      setWorkspace((current) => applyRevision(current, revision));
+      setWorkspace((current) => applyRevision(current, data.revision as CADRevision));
     } catch {
-      setWorkspace((current) => ({
-        ...current,
-        running: false,
-        error: "The CAD engine connection was interrupted during rebuild.",
-        steps: updateStep(current.steps, "kernel", "failed"),
-      }));
+      setWorkspace((current) =>
+        updateActiveAgent(current, {
+          running: false,
+          error: "The CAD engine connection was interrupted during rebuild.",
+          steps: updateStep(currentActiveSteps(current), "kernel", "failed"),
+        }),
+      );
     }
   }
 
@@ -121,15 +167,7 @@ export function CADAgentWorkspace() {
         <button>Templates</button>
       </aside>
       <section className="workspace-stage">
-        <AgentThread
-          prompt={visiblePrompt}
-          steps={workspace.steps}
-          artifacts={workspace.artifacts}
-          validation={workspace.validation}
-          error={workspace.error}
-          running={workspace.running}
-          onSubmit={runPrompt}
-        />
+        <AgentThread messages={workspace.messages} running={workspace.running} onSubmit={revisePrompt} />
         <CADArtifactCanvas
           revision={workspace.revision}
           artifacts={workspace.artifacts}
@@ -148,37 +186,36 @@ export function CADAgentWorkspace() {
 
 function reduceEvent(current: WorkspaceState, event: AgentEvent): WorkspaceState {
   switch (event.type) {
-    case "run.started":
-      return { ...current, prompt: event.prompt, error: undefined };
     case "step":
-      return {
-        ...current,
-        steps: updateStep(current.steps, event.stepId, event.status, event.detail),
-      };
+      return updateActiveAgent(current, {
+        steps: updateStep(currentActiveSteps(current), event.stepId, event.status, event.detail),
+      });
     case "spec":
       return { ...current, spec: event.spec };
     case "artifact": {
       const artifacts = upsertArtifact(current.artifacts, event.artifact);
-      return {
-        ...current,
-        artifacts,
-        drawing: event.artifact.kind === "drawingSvg" ? event.artifact : current.drawing,
-      };
+      return updateActiveAgent(
+        {
+          ...current,
+          artifacts,
+          drawing: event.artifact.kind === "drawingSvg" ? event.artifact : current.drawing,
+        },
+        { artifacts },
+      );
     }
     case "preview":
-      return { ...current, preview: event.artifact };
+      return { ...updateActiveAgent(current, { preview: event.artifact }), preview: event.artifact };
     case "validation":
-      return { ...current, validation: event.validation };
+      return { ...updateActiveAgent(current, { validation: event.validation }), validation: event.validation };
     case "revision":
       return applyRevision(current, event.revision);
     case "run.completed":
       return applyRevision({ ...current, running: false }, event.revision);
     case "error":
-      return {
-        ...current,
+      return updateActiveAgent(current, {
         running: false,
         error: event.userMessage,
-      };
+      });
     default:
       return current;
   }
@@ -187,18 +224,53 @@ function reduceEvent(current: WorkspaceState, event: AgentEvent): WorkspaceState
 function applyRevision(current: WorkspaceState, revision: CADRevision): WorkspaceState {
   const preview = revision.artifacts.find((artifact) => artifact.kind === "stl");
   const drawing = revision.artifacts.find((artifact) => artifact.kind === "drawingSvg");
+  return updateActiveAgent(
+    {
+      ...current,
+      running: false,
+      revision,
+      spec: revision.engineeringSpec,
+      parameters: revision.parameterManifest,
+      artifacts: revision.artifacts,
+      preview,
+      drawing,
+      validation: revision.validation,
+    },
+    {
+      running: false,
+      revision,
+      artifacts: revision.artifacts,
+      preview,
+      validation: revision.validation,
+      steps: currentActiveSteps(current).map((step) => ({
+        ...step,
+        status: step.status === "failed" ? "failed" : "done",
+      })),
+    },
+  );
+}
+
+function updateActiveAgent(current: WorkspaceState, patch: Partial<Extract<ThreadMessage, { role: "agent" }>>): WorkspaceState {
   return {
     ...current,
-    running: false,
-    revision,
-    spec: revision.engineeringSpec,
-    parameters: revision.parameterManifest,
-    artifacts: revision.artifacts,
-    preview,
-    drawing,
-    validation: revision.validation,
-    steps: current.steps.map((step) => ({ ...step, status: step.status === "failed" ? "failed" : "done" })),
+    running: patch.running ?? current.running,
+    messages: current.messages.map((message) =>
+      message.role === "agent" && message.id === current.activeAgentId
+        ? {
+            ...message,
+            ...patch,
+          }
+        : message,
+    ),
   };
+}
+
+function currentActiveSteps(current: WorkspaceState) {
+  const active = current.messages.find(
+    (message): message is Extract<ThreadMessage, { role: "agent" }> =>
+      message.role === "agent" && message.id === current.activeAgentId,
+  );
+  return active?.steps ?? cloneSteps();
 }
 
 function updateStep(steps: WorkstreamStep[], stepId: string, status: WorkstreamStep["status"], detail?: string) {
@@ -208,6 +280,29 @@ function updateStep(steps: WorkstreamStep[], stepId: string, status: WorkstreamS
 function upsertArtifact(artifacts: CADArtifact[], artifact: CADArtifact) {
   const existing = artifacts.filter((item) => item.id !== artifact.id);
   return [...existing, artifact];
+}
+
+function userThreadMessage(content: string): ThreadMessage {
+  return { id: crypto.randomUUID(), role: "user", content };
+}
+
+function agentThreadMessage(revisionLabel: string): ThreadMessage {
+  return {
+    id: crypto.randomUUID(),
+    role: "agent",
+    revisionLabel,
+    steps: cloneSteps(),
+    artifacts: [],
+    running: true,
+  };
+}
+
+function cloneSteps() {
+  return WORKSTREAM_TEMPLATE.map((step) => ({ ...step }));
+}
+
+function formatRevision(index: number) {
+  return `Rev ${String(index).padStart(3, "0")}`;
 }
 
 async function readAgentStream(stream: ReadableStream<Uint8Array>, onEvent: (event: AgentEvent) => void) {
