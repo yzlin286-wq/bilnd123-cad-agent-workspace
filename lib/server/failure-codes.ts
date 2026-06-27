@@ -1,3 +1,5 @@
+import { errorGuidanceForCode } from "@/lib/agent/error-guidance";
+
 export function operationalErrorCode(error: unknown, fallback: string) {
   const message = error instanceof Error ? error.message : String(error || "");
   const normalized = message.toLowerCase();
@@ -31,13 +33,14 @@ export function operationalErrorCode(error: unknown, fallback: string) {
 }
 
 const USER_MESSAGES: Record<string, string> = {
-  UNSUPPORTED_PART_TYPE: "This request is outside the supported staging templates. Use mounting_plate or l_bracket.",
+  UNSUPPORTED_PART_TYPE:
+    "This request is outside the supported staging templates. Supported templates: mounting_plate and l_bracket. Try: make a 120 x 80 x 4 mm mounting plate, or create a 90 x 60 x 40 mm L bracket.",
   PARAMETER_CONFLICT:
-    "The requested dimensions conflict with the CAD template constraints. Adjust hole size, edge offset, chamfer, or part dimensions.",
-  LLM_JSON_ERROR: "The AI model returned a spec the app could not validate. Try a more specific prompt or retry.",
-  CAD_RUNNER_CRASH: "The CAD kernel could not complete this run. Retry once, then escalate with the run id.",
+    "The requested dimensions conflict with the CAD template constraints. Try reducing edgeOffset, increasing the part dimensions, or reducing the hole diameter.",
+  LLM_JSON_ERROR: "The AI model returned a spec the app could not validate. Please retry or contact the staging administrator.",
+  CAD_RUNNER_CRASH: "The CAD kernel could not complete this run. Please retry once or contact the staging administrator.",
   VALIDATION_FAILED: "The CAD model was generated but failed geometry validation. Adjust the parameters or report this revision.",
-  RATE_LIMITED: "Too many CAD requests. Please wait a minute and try again.",
+  RATE_LIMITED: "Too many CAD requests. Please wait about a minute and try again.",
   CAD_ENGINE_NOT_CONNECTED: "CAD engine not connected. Connect build123d before rebuilding files.",
   AI_ENGINE_NOT_CONNECTED: "AI CAD engine not connected. Add your model endpoint before using natural language CAD.",
   INVALID_JSON: "Invalid request body. Send valid JSON and try again.",
@@ -48,5 +51,5 @@ const USER_MESSAGES: Record<string, string> = {
 };
 
 export function userMessageForErrorCode(errorCode: string, fallback = "The CAD agent could not complete this request. Try again or report the run id.") {
-  return USER_MESSAGES[errorCode] ?? fallback;
+  return USER_MESSAGES[errorCode] ?? errorGuidanceForCode(errorCode, fallback).message;
 }

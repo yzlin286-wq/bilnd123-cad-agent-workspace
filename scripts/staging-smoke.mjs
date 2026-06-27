@@ -18,12 +18,15 @@ assert(health.app === "ok", "health app check failed");
 assert(Array.isArray(health.supportedTemplates) && health.supportedTemplates.includes("mounting_plate"), "health templates missing mounting_plate");
 
 const runEvents = await postSSE("/api/agent/run", { prompt: initialPrompt });
+const project = runEvents.find((event) => event.type === "project")?.project;
+assert(project?.id, "initial run did not emit a project id");
 const rev001 = lastEvent(runEvents, "revision")?.revision;
 assert(rev001, "initial run did not emit a revision");
 assert(rev001.validation?.passed, "initial run validation did not pass");
 assert(rev001.engineeringSpec.partType === "mounting_plate", "initial run did not produce mounting_plate");
 
 const reviseEvents = await postSSE("/api/agent/revise", {
+  projectId: project.id,
   currentSpec: rev001.engineeringSpec,
   currentRevisionId: rev001.id,
   userPrompt: revisionPrompt,
@@ -64,6 +67,14 @@ for (const kind of ["step", "stl", "validation", "package"]) {
   artifactDownloads.push(download);
 }
 
+const persistedProject = await getJSON(`/api/projects/${encodeURIComponent(project.id)}`);
+assert(persistedProject.project?.latestRevisionId === rev002.id, "project store did not keep latest revision");
+assert(
+  persistedProject.project?.revisions?.some((revision) => revision.id === rev001.id) &&
+    persistedProject.project?.revisions?.some((revision) => revision.id === rev002.id),
+  "project store did not persist both revisions",
+);
+
 const result = {
   ok: true,
   startedAt: startedAtIso,
@@ -79,6 +90,12 @@ const result = {
   },
   rev001: revisionSummary(rev001),
   rev002: revisionSummary(rev002),
+  project: {
+    id: project.id,
+    latestRevisionId: persistedProject.project.latestRevisionId,
+    revisionCount: persistedProject.project.revisions.length,
+    messageCount: persistedProject.project.messages.length,
+  },
   artifactDownloads,
 };
 

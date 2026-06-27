@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Sparkles } from "lucide-react";
 import { HeroComposer } from "@/components/landing/HeroComposer";
 import { AgentThread, type ThreadMessage } from "@/components/agent/AgentThread";
@@ -15,8 +15,10 @@ import {
   type WorkstreamStep,
 } from "@/lib/agent/spec";
 import type { AgentEvent } from "@/lib/agent/events";
+import type { StoredProject, StoredProjectSummary } from "@/lib/project/types";
 
 type WorkspaceState = {
+  projectId?: string;
   messages: ThreadMessage[];
   activeAgentId?: string;
   revisionCount: number;
@@ -49,6 +51,33 @@ const REBUILD_WORKSTREAM_TEMPLATE: WorkstreamStep[] = [
 export function CADAgentWorkspace() {
   const [hasStarted, setHasStarted] = useState(false);
   const [workspace, setWorkspace] = useState<WorkspaceState>(() => emptyWorkspace());
+  const [recentProjects, setRecentProjects] = useState<StoredProjectSummary[]>([]);
+  const [loadingRecent, setLoadingRecent] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadLatestProject() {
+      try {
+        const projects = await fetchProjectSummaries();
+        if (cancelled) return;
+        setRecentProjects(projects);
+        const latest = projects[0];
+        if (latest?.latestRevisionId) {
+          const project = await fetchProject(latest.id);
+          if (!cancelled && project) {
+            setWorkspace(workspaceFromProject(project));
+            setHasStarted(true);
+          }
+        }
+      } finally {
+        if (!cancelled) setLoadingRecent(false);
+      }
+    }
+    void loadLatestProject();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   async function runPrompt(prompt: string) {
     setHasStarted(true);
@@ -62,6 +91,7 @@ export function CADAgentWorkspace() {
       running: true,
     });
     await consumeAgentEndpoint("/api/agent/run", { prompt });
+    await refreshRecentProjects();
   }
 
   async function revisePrompt(userPrompt: string) {
@@ -82,10 +112,12 @@ export function CADAgentWorkspace() {
     }));
 
     await consumeAgentEndpoint("/api/agent/revise", {
+      projectId: workspace.projectId,
       currentSpec: workspace.spec,
       currentRevisionId: workspace.revision.id,
       userPrompt,
     });
+    await refreshRecentProjects();
   }
 
   async function consumeAgentEndpoint(endpoint: string, body: unknown) {
@@ -97,10 +129,12 @@ export function CADAgentWorkspace() {
       });
 
       if (!response.ok || !response.body) {
+        const data = await safeResponseJSON(response);
         setWorkspace((current) =>
           updateActiveAgent(current, {
             running: false,
-            error: "The CAD agent could not start. Please try again.",
+            errorCode: data?.error,
+            error: data?.userMessage ?? "The CAD agent could not start. Please try again.",
           }),
         );
         return;
@@ -113,6 +147,7 @@ export function CADAgentWorkspace() {
       setWorkspace((current) =>
         updateActiveAgent(current, {
           running: false,
+          errorCode: "SSE_ABORT",
           error: "Connection interrupted while generating your CAD model.",
         }),
       );
@@ -144,13 +179,14 @@ export function CADAgentWorkspace() {
       const response = await fetch("/api/cad/rebuild", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ spec, prompt: "parameter rebuild" }),
+        body: JSON.stringify({ projectId: workspace.projectId, spec, prompt: "parameter rebuild" }),
       });
-      const data = (await response.json()) as { revision?: CADRevision; userMessage?: string };
+      const data = (await response.json()) as { revision?: CADRevision; userMessage?: string; error?: string };
       if (!response.ok || !data.revision) {
         setWorkspace((current) =>
           updateActiveAgent(current, {
             running: false,
+            errorCode: data.error,
             error: data.userMessage ?? "The CAD engine could not rebuild this revision.",
             steps: updateStep(currentActiveSteps(current), "kernel", "failed"),
           }),
@@ -162,25 +198,71 @@ export function CADAgentWorkspace() {
         updateActiveAgent(current, {
           steps: updateStep(
             updateStep(
-              updateStep(currentActiveSteps(current), "kernel", "done"),
-              "step",
-              "done",
+              updateStep(
+                updateStep(currentActiveSteps(current), "kernel", "done"),
+                "step",
+                "done",
+              ),
+              "validation",
+              revision.validation?.passed ? "done" : "failed",
             ),
-            "validation",
-            revision.validation?.passed ? "done" : "failed",
+            "package",
+            "done",
           ),
         }),
       );
       setWorkspace((current) => applyRevision(current, revision));
+      await refreshRecentProjects();
     } catch {
       setWorkspace((current) =>
         updateActiveAgent(current, {
           running: false,
+          errorCode: "CAD_RUNNER_CRASH",
           error: "The CAD engine connection was interrupted during rebuild.",
           steps: updateStep(currentActiveSteps(current), "kernel", "failed"),
         }),
       );
     }
+  }
+
+  async function submitFeedback({
+    rating,
+    comment,
+  }: {
+    rating: "up" | "down";
+    comment: string;
+  }) {
+    const revisionId = workspace.revision?.id;
+    const response = await fetch("/api/feedback", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        rating,
+        comment,
+        revisionId,
+        route: workspace.revisionCount > 1 ? "/api/agent/revise" : "/api/agent/run",
+      }),
+    });
+    if (!response.ok) {
+      throw new Error("Feedback could not be saved.");
+    }
+  }
+
+  async function refreshRecentProjects() {
+    const projects = await fetchProjectSummaries();
+    setRecentProjects(projects);
+  }
+
+  async function loadProject(projectId: string) {
+    const project = await fetchProject(projectId);
+    if (!project) return;
+    setWorkspace(workspaceFromProject(project));
+    setHasStarted(true);
+  }
+
+  function startNewProject() {
+    setWorkspace(emptyWorkspace());
+    setHasStarted(false);
   }
 
   if (!hasStarted) {
@@ -193,9 +275,24 @@ export function CADAgentWorkspace() {
         <div className="brand-pill">
           <Sparkles size={17} />
         </div>
-        <button onClick={() => setHasStarted(false)}>New CAD</button>
-        <button>Recent</button>
-        <button>Templates</button>
+        <button onClick={startNewProject}>New CAD</button>
+        <div className="recent-rail">
+          <span>Recent</span>
+          {loadingRecent ? <small>Loading...</small> : null}
+          {!loadingRecent && !recentProjects.length ? <small>No saved projects</small> : null}
+          {recentProjects.map((project) => (
+            <button
+              className={project.id === workspace.projectId ? "active" : ""}
+              onClick={() => loadProject(project.id)}
+              key={project.id}
+            >
+              <strong>{project.title}</strong>
+              <small>
+                {project.revisionCount} rev{project.revisionCount === 1 ? "" : "s"}
+              </small>
+            </button>
+          ))}
+        </div>
       </aside>
       <section className="workspace-stage">
         <AgentThread messages={workspace.messages} running={workspace.running} onSubmit={revisePrompt} />
@@ -209,14 +306,31 @@ export function CADAgentWorkspace() {
           validation={workspace.validation}
           running={workspace.running}
           onRebuild={rebuildFromParameters}
+          onFeedback={submitFeedback}
         />
       </section>
     </main>
   );
 }
 
+async function fetchProjectSummaries() {
+  const response = await fetch("/api/projects?limit=8", { cache: "no-store" });
+  if (!response.ok) return [];
+  const data = (await response.json()) as { projects?: StoredProjectSummary[] };
+  return data.projects ?? [];
+}
+
+async function fetchProject(projectId: string) {
+  const response = await fetch(`/api/projects/${encodeURIComponent(projectId)}`, { cache: "no-store" });
+  if (!response.ok) return undefined;
+  const data = (await response.json()) as { project?: StoredProject };
+  return data.project;
+}
+
 function reduceEvent(current: WorkspaceState, event: AgentEvent): WorkspaceState {
   switch (event.type) {
+    case "project":
+      return { ...current, projectId: event.project.id };
     case "step":
       return updateActiveAgent(current, {
         steps: updateStep(currentActiveSteps(current), event.stepId, event.status, event.detail),
@@ -245,6 +359,7 @@ function reduceEvent(current: WorkspaceState, event: AgentEvent): WorkspaceState
     case "error":
       return updateActiveAgent(current, {
         running: false,
+        errorCode: event.code,
         error: event.userMessage,
       });
     default:
@@ -279,6 +394,80 @@ function applyRevision(current: WorkspaceState, revision: CADRevision): Workspac
       })),
     },
   );
+}
+
+function workspaceFromProject(project: StoredProject): WorkspaceState {
+  const latestRevision =
+    project.revisions.find((revision) => revision.id === project.latestRevisionId) ?? project.revisions.at(-1);
+  const preview = latestRevision?.artifacts.find((artifact) => artifact.kind === "stl");
+  const drawing = latestRevision?.artifacts.find((artifact) => artifact.kind === "drawingSvg");
+  const revisionsById = new Map(project.revisions.map((revision) => [revision.id, revision]));
+  const revisionLabels = new Map(project.revisions.map((revision, index) => [revision.id, formatRevision(index + 1)]));
+  const messages: ThreadMessage[] = project.messages.length
+    ? project.messages.map((message) => {
+        if (message.role === "user") {
+          return { id: message.id, role: "user", content: message.content };
+        }
+        const revision = message.revisionId ? revisionsById.get(message.revisionId) : undefined;
+        return agentThreadMessageFromStore({
+          id: message.id,
+          revisionLabel: (message.revisionId && revisionLabels.get(message.revisionId)) || "Revision",
+          revision,
+          error: message.errorCode ? message.content : undefined,
+          errorCode: message.errorCode,
+        });
+      })
+    : project.revisions.map((revision, index) =>
+        agentThreadMessageFromStore({
+          id: revision.id,
+          revisionLabel: formatRevision(index + 1),
+          revision,
+        }),
+      );
+  const lastAgent = [...messages].reverse().find((message) => message.role === "agent");
+
+  return {
+    projectId: project.id,
+    messages,
+    activeAgentId: lastAgent?.id,
+    revisionCount: project.revisions.length,
+    artifacts: latestRevision?.artifacts ?? [],
+    preview,
+    drawing,
+    validation: latestRevision?.validation,
+    revision: latestRevision,
+    spec: latestRevision?.engineeringSpec,
+    parameters: latestRevision?.parameterManifest ?? [],
+    running: false,
+  };
+}
+
+function agentThreadMessageFromStore({
+  id,
+  revisionLabel,
+  revision,
+  error,
+  errorCode,
+}: {
+  id: string;
+  revisionLabel: string;
+  revision?: CADRevision;
+  error?: string;
+  errorCode?: string;
+}): Extract<ThreadMessage, { role: "agent" }> {
+  return {
+    id,
+    role: "agent",
+    revisionLabel,
+    steps: revision ? doneSteps() : cloneSteps(),
+    artifacts: revision?.artifacts ?? [],
+    preview: revision?.artifacts.find((artifact) => artifact.kind === "stl"),
+    validation: revision?.validation,
+    revision,
+    error,
+    errorCode,
+    running: false,
+  };
 }
 
 function updateActiveAgent(current: WorkspaceState, patch: Partial<Extract<ThreadMessage, { role: "agent" }>>): WorkspaceState {
@@ -332,12 +521,24 @@ function cloneSteps() {
   return WORKSTREAM_TEMPLATE.map((step) => ({ ...step }));
 }
 
+function doneSteps() {
+  return WORKSTREAM_TEMPLATE.map((step) => ({ ...step, status: "done" as const }));
+}
+
 function cloneRebuildSteps() {
   return REBUILD_WORKSTREAM_TEMPLATE.map((step) => ({ ...step }));
 }
 
 function formatRevision(index: number) {
   return `Rev ${String(index).padStart(3, "0")}`;
+}
+
+async function safeResponseJSON(response: Response) {
+  try {
+    return (await response.json()) as { error?: string; userMessage?: string };
+  } catch {
+    return undefined;
+  }
 }
 
 async function readAgentStream(stream: ReadableStream<Uint8Array>, onEvent: (event: AgentEvent) => void) {

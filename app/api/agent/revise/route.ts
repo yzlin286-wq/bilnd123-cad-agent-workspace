@@ -4,6 +4,13 @@ import { runRevisionOrchestration } from "@/lib/agent/orchestrator";
 import { enforcePromptLimit, enforceRateLimit, friendlyJSONError } from "@/lib/server/request-guards";
 import { userMessageForErrorCode } from "@/lib/server/failure-codes";
 import { appendRunHistory } from "@/lib/server/run-history";
+import {
+  appendProjectError,
+  appendProjectMessage,
+  appendProjectRevision,
+  getProject,
+  projectSummary,
+} from "@/lib/server/project-store";
 import type { EngineeringSpec } from "@/lib/agent/spec";
 
 export const runtime = "nodejs";
@@ -21,12 +28,14 @@ export async function POST(request: Request) {
     currentSpec?: EngineeringSpec;
     currentRevisionId?: string;
     userPrompt?: string;
+    projectId?: string;
   };
   try {
     body = (await request.json()) as {
       currentSpec?: EngineeringSpec;
       currentRevisionId?: string;
       userPrompt?: string;
+      projectId?: string;
     };
   } catch {
     await logRejectedRevision(guardRunId, startedAt, "INVALID_JSON");
@@ -42,15 +51,42 @@ export async function POST(request: Request) {
     await logRejectedRevision(guardRunId, startedAt, "PROMPT_TOO_LONG", body.userPrompt);
     return promptLimitResponse;
   }
+  const project = body.projectId ? await getProject(body.projectId) : undefined;
+  if (project) {
+    await appendProjectMessage({
+      projectId: project.id,
+      role: "user",
+      content: body.userPrompt,
+      route: "/api/agent/revise",
+    });
+  }
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
-      const emit = (event: Parameters<typeof encodeSSE>[0]) => {
+      const emit = async (event: Parameters<typeof encodeSSE>[0]) => {
         controller.enqueue(encoder.encode(encodeSSE(event)));
+        if (event.type === "revision") {
+          await appendProjectRevision({
+            projectId: project?.id,
+            revision: event.revision,
+            route: "/api/agent/revise",
+          });
+        }
+        if (event.type === "error") {
+          await appendProjectError({
+            projectId: project?.id,
+            route: "/api/agent/revise",
+            errorCode: event.code,
+            userMessage: event.userMessage,
+          });
+        }
       };
 
       try {
+        if (project) {
+          await emit({ type: "project", project: projectSummary(project) });
+        }
         await runRevisionOrchestration({
           currentSpec: body.currentSpec as EngineeringSpec,
           currentRevisionId: body.currentRevisionId as string,

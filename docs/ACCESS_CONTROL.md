@@ -4,9 +4,9 @@ This staging app is for short internal trials only. Current HTTP staging must be
 
 Do not commit real IP addresses, tester CIDRs, passwords, API keys, tunnel tokens, certificates, or private keys.
 
-## v0.9 Selected Trial Scheme
+## v1.0-alpha Selected Trial Scheme
 
-For the controlled v0.9 internal trial, use the IP allowlist approach for the staging app port. This keeps the current HTTP + Basic Auth deployment path, avoids occupying ports `80` and `443`, and reduces exposure while there is no formal staging domain.
+For the controlled v1.0-alpha internal trial, continue using the IP allowlist approach for the staging app port unless the deployment is upgraded to a private tunnel or HTTPS. This keeps the current HTTP + Basic Auth deployment path, avoids occupying ports `80` and `443`, and reduces exposure while there is no formal staging domain.
 
 Store the real allowlist only in the cloud firewall, host firewall, or server-only operations notes. Do not commit real tester IPs or CIDRs.
 
@@ -20,6 +20,7 @@ STAGING_ACCESS_MODE=http_restricted
 
 - App-level Basic Auth must stay enabled for staging.
 - `/api/artifacts/[id]` is protected by the same Basic Auth proxy as `/api/health`, `/api/agent/run`, `/api/agent/revise`, and `/api/cad/rebuild`.
+- `/admin`, `/api/projects`, and `/api/feedback` are protected by the same Basic Auth proxy.
 - Plain HTTP plus Basic Auth is acceptable only for a short operator smoke on a restricted network path.
 - Before a 48-72 hour internal trial, use HTTPS, a private network, an authenticated tunnel, or a cloud firewall allowlist.
 - `/api/health` returns a safe `accessMode` field. It must not expose hostnames, server IPs, secrets, filesystem paths, or model endpoints.

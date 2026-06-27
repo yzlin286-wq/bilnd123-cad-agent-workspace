@@ -23,7 +23,7 @@ export function enforceRateLimit(request: Request) {
   }
   bucket.count += 1;
   if (bucket.count <= RATE_LIMIT_MAX_REQUESTS) return undefined;
-  return friendlyJSONError("RATE_LIMITED", "Too many CAD requests. Please wait a minute and try again.", 429);
+    return friendlyJSONError("RATE_LIMITED", "Too many CAD requests. Please wait about a minute and try again.", 429);
 }
 
 export function enforcePromptLimit(prompt: string | undefined, field = "prompt") {

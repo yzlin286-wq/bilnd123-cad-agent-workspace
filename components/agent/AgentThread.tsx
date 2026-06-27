@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ArrowUp, CheckCircle2, Circle, Loader2, TriangleAlert } from "lucide-react";
 import { WorkstreamCard } from "@/components/agent/WorkstreamCard";
 import { ArtifactCard } from "@/components/artifacts/ArtifactCard";
+import { errorGuidanceForCode } from "@/lib/agent/error-guidance";
 import type { CADArtifact, CADRevision, ValidationReport, WorkstreamStep } from "@/lib/agent/spec";
 
 export type ThreadMessage =
@@ -22,6 +23,7 @@ export type ThreadMessage =
       validation?: ValidationReport;
       revision?: CADRevision;
       error?: string;
+      errorCode?: string;
       running: boolean;
     };
 
@@ -73,6 +75,7 @@ export function AgentThread({
 }
 
 function AgentMessage({ message }: { message: Extract<ThreadMessage, { role: "agent" }> }) {
+  const guidance = message.error ? errorGuidanceForCode(message.errorCode, message.error) : undefined;
   return (
     <article className="chat-message agent">
       <span>Agent</span>
@@ -82,7 +85,7 @@ function AgentMessage({ message }: { message: Extract<ThreadMessage, { role: "ag
             <p className="microcopy">Creating your CAD model</p>
             <h2>
               {message.error
-                ? "Needs connection"
+                ? guidance?.title
                 : message.running
                   ? `${message.revisionLabel} in progress`
                   : `${message.revisionLabel} ready for review`}
@@ -94,7 +97,16 @@ function AgentMessage({ message }: { message: Extract<ThreadMessage, { role: "ag
         {message.error ? (
           <div className="friendly-error">
             <TriangleAlert size={18} />
-            <p>{message.error}</p>
+            <div>
+              <p>{guidance?.message ?? message.error}</p>
+              {guidance?.suggestions.length ? (
+                <ul>
+                  {guidance.suggestions.map((suggestion) => (
+                    <li key={suggestion}>{suggestion}</li>
+                  ))}
+                </ul>
+              ) : null}
+            </div>
           </div>
         ) : null}
         {message.artifacts.length ? (

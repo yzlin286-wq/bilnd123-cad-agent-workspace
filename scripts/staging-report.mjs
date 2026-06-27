@@ -9,20 +9,23 @@ import { summarizeRunHistory } from "./summarize-runs.mjs";
 const DEFAULT_LOG_PATH = path.resolve(process.cwd(), "logs", "runs.jsonl");
 const DEFAULT_SMOKE_PATH = path.resolve(process.cwd(), "outputs", "smoke", "latest.json");
 const DEFAULT_PROTOCOL_PATH = path.resolve(process.cwd(), "outputs", "protocol", "latest.json");
+const DEFAULT_FEEDBACK_PATH = path.resolve(process.cwd(), "logs", "feedback.jsonl");
 const DEFAULT_OUTPUT_PATH = path.resolve(process.cwd(), "outputs", "reports", "staging-report.md");
 
 export async function generateStagingReport({
   logPath = DEFAULT_LOG_PATH,
   smokePath = DEFAULT_SMOKE_PATH,
   protocolPath = DEFAULT_PROTOCOL_PATH,
+  feedbackPath = DEFAULT_FEEDBACK_PATH,
   outputPath = DEFAULT_OUTPUT_PATH,
   since,
 } = {}) {
-  const [summary, classification, smokeRecord, protocolRecord] = await Promise.all([
+  const [summary, classification, smokeRecord, protocolRecord, feedback] = await Promise.all([
     summarizeRunHistory({ logPath }),
     classifyRunHistory({ logPath }),
     readJSONRecordIfExists(smokePath),
     readJSONRecordIfExists(protocolPath),
+    summarizeFeedback(feedbackPath),
   ]);
   const smoke = smokeRecord?.payload;
   const protocol = protocolRecord?.payload;
@@ -35,6 +38,7 @@ export async function generateStagingReport({
     smokeUpdatedAt: smokeRecord?.updatedAt,
     protocol,
     protocolUpdatedAt: protocolRecord?.updatedAt,
+    feedback,
     newClassification,
     since: effectiveSince,
     generatedAt: new Date().toISOString(),
@@ -59,6 +63,7 @@ export function renderReport({
   smokeUpdatedAt,
   protocol,
   protocolUpdatedAt,
+  feedback,
   newClassification,
   since,
   generatedAt,
@@ -116,12 +121,39 @@ export function renderReport({
     "",
     ...newUnexpectedLines(newClassification, since),
     "",
+    "## Trial Feedback",
+    "",
+    ...feedbackLines(feedback),
+    "",
     "## Action Items",
     "",
-    ...actionItemLines({ classification, smoke, protocol }),
+    ...actionItemLines({ classification, smoke, protocol, feedback }),
     "",
   ];
   return `${lines.join("\n")}\n`;
+}
+
+async function summarizeFeedback(feedbackPath) {
+  try {
+    const text = await fs.readFile(feedbackPath, "utf8");
+    const entries = text
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((line) => JSON.parse(line));
+    const negative = entries.filter((entry) => entry.rating === "down");
+    return {
+      total: entries.length,
+      positive: entries.filter((entry) => entry.rating === "up").length,
+      negative: negative.length,
+      negativeRevisionIds: [...new Set(negative.map((entry) => entry.revisionId).filter(Boolean))],
+    };
+  } catch (error) {
+    if (error?.code === "ENOENT") {
+      return { total: 0, positive: 0, negative: 0, negativeRevisionIds: [] };
+    }
+    throw error;
+  }
 }
 
 async function readJSONRecordIfExists(filePath) {
@@ -212,7 +244,17 @@ function newUnexpectedLines(newClassification, since) {
   ];
 }
 
-function actionItemLines({ classification, smoke, protocol }) {
+function feedbackLines(feedback) {
+  if (!feedback) return ["- Total: 0", "- Positive: 0", "- Negative: 0", "- Negative revision IDs: none"];
+  return [
+    `- Total: ${feedback.total}`,
+    `- Positive: ${feedback.positive}`,
+    `- Negative: ${feedback.negative}`,
+    `- Negative revision IDs: ${feedback.negativeRevisionIds?.length ? feedback.negativeRevisionIds.join(", ") : "none"}`,
+  ];
+}
+
+function actionItemLines({ classification, smoke, protocol, feedback }) {
   const items = [];
   if (classification.unexpectedFailureCount > 0) {
     items.push("Triage historical unexpected failures using `docs/FAILURE_TRIAGE.md`, then convert reproducible cases into tests.");
@@ -230,6 +272,9 @@ function actionItemLines({ classification, smoke, protocol }) {
   }
   if (smoke?.health?.httpsConfigured === false) {
     items.push("Restrict access or enable HTTPS before broad internal trial traffic.");
+  }
+  if ((feedback?.negative ?? 0) > 0) {
+    items.push("Review negative feedback revision IDs and convert reproducible issues into regression fixtures.");
   }
   if (!items.length) return ["- none"];
   return items.map((item) => `- ${item}`);
@@ -273,6 +318,7 @@ function parseArgs(argv) {
     logPath: DEFAULT_LOG_PATH,
     smokePath: DEFAULT_SMOKE_PATH,
     protocolPath: DEFAULT_PROTOCOL_PATH,
+    feedbackPath: DEFAULT_FEEDBACK_PATH,
     outputPath: DEFAULT_OUTPUT_PATH,
     since: undefined,
   };
@@ -285,6 +331,9 @@ function parseArgs(argv) {
       index += 1;
     } else if (argv[index] === "--protocol") {
       args.protocolPath = path.resolve(argv[index + 1]);
+      index += 1;
+    } else if (argv[index] === "--feedback") {
+      args.feedbackPath = path.resolve(argv[index + 1]);
       index += 1;
     } else if (argv[index] === "--output") {
       args.outputPath = path.resolve(argv[index + 1]);

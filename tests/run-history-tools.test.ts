@@ -38,6 +38,7 @@ async function loadReportModule() {
       logPath: string;
       smokePath: string;
       protocolPath?: string;
+      feedbackPath?: string;
       outputPath: string;
       since?: string;
     }) => Promise<{ outputPath: string; smokePresent: boolean }>;
@@ -162,6 +163,7 @@ test("staging report writes sanitized markdown without prompts", async () => {
   const logPath = path.join(tempRoot, "runs.jsonl");
   const smokePath = path.join(tempRoot, "latest.json");
   const protocolPath = path.join(tempRoot, "protocol.json");
+  const feedbackPath = path.join(tempRoot, "feedback.jsonl");
   const outputPath = path.join(tempRoot, "staging-report.md");
 
   await fs.writeFile(
@@ -218,8 +220,23 @@ test("staging report writes sanitized markdown without prompts", async () => {
     }),
     "utf8",
   );
+  await fs.writeFile(
+    feedbackPath,
+    [
+      JSON.stringify({ rating: "up", revisionId: "rev001", comment: "good" }),
+      JSON.stringify({ rating: "down", revisionId: "rev002", comment: "needs work" }),
+    ].join("\n"),
+    "utf8",
+  );
 
-  const result = await generateStagingReport({ logPath, smokePath, protocolPath, outputPath, since: "2026-06-27T00:00:00.000Z" });
+  const result = await generateStagingReport({
+    logPath,
+    smokePath,
+    protocolPath,
+    feedbackPath,
+    outputPath,
+    since: "2026-06-27T00:00:00.000Z",
+  });
   const markdown = await fs.readFile(result.outputPath, "utf8");
 
   assert.equal(result.smokePresent, true);
@@ -229,6 +246,8 @@ test("staging report writes sanitized markdown without prompts", async () => {
   assert.match(markdown, /Protocol total: 1/);
   assert.match(markdown, /Protocol passed: 1/);
   assert.match(markdown, /New unexpected failures: 1/);
+  assert.match(markdown, /Trial Feedback/);
+  assert.match(markdown, /Negative revision IDs: rev002/);
   assert.equal(markdown.includes("do not include this full prompt"), false);
 
   await fs.rm(tempRoot, { recursive: true, force: true });

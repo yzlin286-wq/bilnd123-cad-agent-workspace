@@ -1,0 +1,42 @@
+[
+  {
+    "id": 11,
+    "category": "revision",
+    "prompt": "After a successful mounting plate, say: change thickness to 6 mm.",
+    "expectedFailureClass": "none"
+  },
+  {
+    "id": 12,
+    "category": "revision",
+    "prompt": "After a successful mounting plate, say: make the chamfer 2 mm.",
+    "expectedFailureClass": "none"
+  },
+  {
+    "id": 16,
+    "category": "unsupported partType",
+    "prompt": "Make a gear with 24 teeth and export STEP.",
+    "expectedFailureClass": "expected_failure",
+    "expectedErrorCode": "UNSUPPORTED_PART_TYPE"
+  },
+  {
+    "id": 17,
+    "category": "unsupported partType",
+    "prompt": "Design a Raspberry Pi enclosure.",
+    "expectedFailureClass": "expected_failure",
+    "expectedErrorCode": "UNSUPPORTED_PART_TYPE"
+  },
+  {
+    "id": 19,
+    "category": "parameter conflict",
+    "prompt": "Make a 20 x 20 x 4 mm mounting plate with 6 mm holes and 12 mm edge offset.",
+    "expectedFailureClass": "expected_failure",
+    "expectedErrorCode": "PARAMETER_CONFLICT"
+  },
+  {
+    "id": 20,
+    "category": "parameter conflict",
+    "prompt": "Make an L bracket 30 mm long, 20 mm high, 20 mm wide, 4 mm thick, 8 mm holes, 15 mm edge offset.",
+    "expectedFailureClass": "expected_failure",
+    "expectedErrorCode": "PARAMETER_CONFLICT"
+  }
+]

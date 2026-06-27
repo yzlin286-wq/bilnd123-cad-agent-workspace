@@ -4,7 +4,7 @@ AI CAD Agent workspace built with Next.js, React, Three.js, and build123d.
 
 The product surface is intentionally user-facing: users start with natural language, then watch an agent workstream create an engineering spec, run the CAD kernel, validate geometry, and expose real artifacts for preview and download.
 
-Current stage: `v0.9 controlled internal trial execution`.
+Current stage: `v1.0-alpha internal alpha readiness`.
 
 ## Product Shape
 
@@ -15,6 +15,9 @@ Current stage: `v0.9 controlled internal trial execution`.
 - No user-facing internal control panels
 - Supported CAD templates: `mounting_plate` and `l_bracket`
 - Upload sketch: visible as `Coming soon`, disabled until image-to-CAD is implemented
+- Recent projects, messages, revisions, and artifact metadata persist locally for alpha trials
+- Trial feedback captures thumbs up/down and optional comments without user accounts
+- `/admin` provides a Basic Auth-protected alpha usage dashboard
 
 Not currently supported:
 
@@ -131,9 +134,13 @@ http://127.0.0.1:3000
 ## Main APIs
 
 - `GET /api/health`: safe health summary for staging
+- `GET /admin`: Basic Auth-protected alpha usage dashboard
+- `GET /api/projects`: recent saved project summaries
+- `GET /api/projects/[id]`: saved project, messages, revisions, and artifact metadata
 - `POST /api/agent/run`: SSE agent orchestration endpoint
 - `POST /api/agent/revise`: SSE revision endpoint that applies `currentSpec + specDelta` by default
 - `POST /api/cad/rebuild`: rebuilds a revision from an explicit parameter/spec payload
+- `POST /api/feedback`: saves thumbs up/down internal trial feedback
 - `GET /api/artifacts/[id]`: streams generated artifacts from local output storage
 
 Legacy diagnostic endpoints may remain for development, but the user-facing app is driven by the agent/rebuild/artifact flow above.
@@ -160,4 +167,11 @@ Observation tools:
 - `npm run staging:report`: generate a local sanitized report at `outputs/reports/staging-report.md`
 - `npm run staging:protocol`: dry-run the 20-prompt internal trial protocol at `outputs/protocol/latest.json`
 
-`npm run staging:protocol -- --execute --output outputs/protocol/latest.json` calls the real staging service and can incur model/API cost. Use it only when the staging access path and Basic Auth are configured. The v0.9 controlled trial path expects `STAGING_ACCESS_MODE=http_restricted` after the staging port is restricted by an IP allowlist.
+`npm run staging:protocol -- --execute --output outputs/protocol/latest.json` calls the real staging service and can incur model/API cost. Use it only when the staging access path and Basic Auth are configured. The v1.0-alpha controlled trial path expects `STAGING_ACCESS_MODE=http_restricted` after the staging port is restricted by an IP allowlist, unless the deployment is upgraded to `private_network_or_tunnel` or `https`.
+
+Alpha persistence and feedback files live in the staging log volume:
+
+- `logs/projects.json`: saved projects, messages, revisions, and artifact metadata
+- `logs/feedback.jsonl`: sanitized thumbs up/down feedback entries
+
+These files must not contain model API keys, Basic Auth passwords, provider raw responses, cookies, or private server paths.

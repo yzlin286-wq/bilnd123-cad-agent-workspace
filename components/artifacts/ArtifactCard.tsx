@@ -24,9 +24,9 @@ function iconFor(kind: CADArtifact["kind"]) {
 
 function labelFor(artifact: CADArtifact) {
   if (artifact.kind === "step") return "Download STEP";
-  if (artifact.kind === "stl") return "Preview mesh";
-  if (artifact.kind === "drawingSvg") return "Drawing SVG";
-  if (artifact.kind === "source") return "Source code";
+  if (artifact.kind === "stl") return "Download preview STL";
+  if (artifact.kind === "drawingSvg") return "Download drawing SVG";
+  if (artifact.kind === "source") return "Download source.py";
   if (artifact.kind === "validation") return "Validation";
   if (artifact.kind === "package") return "Download package";
   return artifact.label;

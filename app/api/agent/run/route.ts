@@ -4,6 +4,14 @@ import { runAgentOrchestration } from "@/lib/agent/orchestrator";
 import { enforcePromptLimit, enforceRateLimit, friendlyJSONError } from "@/lib/server/request-guards";
 import { userMessageForErrorCode } from "@/lib/server/failure-codes";
 import { appendRunHistory } from "@/lib/server/run-history";
+import {
+  appendProjectError,
+  appendProjectMessage,
+  appendProjectRevision,
+  createProject,
+  getProject,
+  projectSummary,
+} from "@/lib/server/project-store";
 
 export const runtime = "nodejs";
 
@@ -16,9 +24,9 @@ export async function POST(request: Request) {
     return rateLimitResponse;
   }
 
-  let body: { prompt?: string };
+  let body: { prompt?: string; projectId?: string };
   try {
-    body = (await request.json()) as { prompt?: string };
+    body = (await request.json()) as { prompt?: string; projectId?: string };
   } catch {
     await logRejectedRun(guardRunId, startedAt, "INVALID_JSON");
     return friendlyJSONError("INVALID_JSON", userMessageForErrorCode("INVALID_JSON"), 400);
@@ -35,14 +43,39 @@ export async function POST(request: Request) {
     return promptLimitResponse;
   }
 
+  const project = (body.projectId ? await getProject(body.projectId) : undefined) ?? (await createProject({ prompt }));
+  await appendProjectMessage({
+    projectId: project.id,
+    role: "user",
+    content: prompt,
+    route: "/api/agent/run",
+  });
+  const initialProject = projectSummary(project);
+
   const encoder = new TextEncoder();
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
-      const emit = (event: Parameters<typeof encodeSSE>[0]) => {
+      const emit = async (event: Parameters<typeof encodeSSE>[0]) => {
         controller.enqueue(encoder.encode(encodeSSE(event)));
+        if (event.type === "revision") {
+          await appendProjectRevision({
+            projectId: project.id,
+            revision: event.revision,
+            route: "/api/agent/run",
+          });
+        }
+        if (event.type === "error") {
+          await appendProjectError({
+            projectId: project.id,
+            route: "/api/agent/run",
+            errorCode: event.code,
+            userMessage: event.userMessage,
+          });
+        }
       };
 
       try {
+        await emit({ type: "project", project: initialProject });
         await runAgentOrchestration(prompt, emit, "/api/agent/run");
       } finally {
         controller.close();

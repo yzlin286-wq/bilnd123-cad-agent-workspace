@@ -16,6 +16,13 @@ Run metadata lives under:
 logs/runs.jsonl
 ```
 
+Alpha project and feedback records live under:
+
+```text
+logs/projects.json
+logs/feedback.jsonl
+```
+
 Back up only what the team needs for internal review. Do not store model API keys in backups.
 
 Cleanup command:
@@ -229,6 +236,10 @@ tail -n 50 logs/runs.jsonl
 
 Fields include timestamp, route, runId, revisionId, partType, model, status, durationMs, artifactCount, validationPassed, errorCode, and truncated prompt.
 
+Saved alpha projects are stored in `logs/projects.json`. They contain sanitized messages, revision metadata, artifact IDs/URLs, specs, and validation results. They must not contain provider raw responses, API keys, Basic Auth passwords, cookies, or private server paths.
+
+Trial feedback is stored in `logs/feedback.jsonl`. It contains thumbs up/down, optional sanitized comments, revision IDs, routes, and timestamps.
+
 Summarize run history:
 
 ```bash
@@ -280,6 +291,8 @@ npm run runs:classify
 npm run staging:report
 npm run failures:export
 ```
+
+Open `/admin` from an allowlisted network to review the same alpha dashboard behind Basic Auth.
 
 Use `npm run runs:classify -- --since <ISO timestamp>` to separate historical unexpected failures from failures introduced after a deployment.
 

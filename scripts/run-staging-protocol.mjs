@@ -237,6 +237,7 @@ async function executeRevisionCase(item, baseUrl) {
 
   const revisionPrompt = extractRevisionPrompt(item.prompt);
   const revised = await postSSE(baseUrl, "/api/agent/revise", {
+    projectId: seed.projectId,
     currentSpec: seed.revision.engineeringSpec,
     currentRevisionId: seed.revision.id,
     userPrompt: revisionPrompt,
@@ -334,6 +335,7 @@ async function postSSE(baseUrl, route, body) {
   const events = parseSSE(text);
   const error = events.find((event) => event.type === "error");
   const revision = events.filter((event) => event.type === "revision").at(-1)?.revision;
+  const projectId = events.find((event) => event.type === "project")?.project?.id;
   if (error) {
     return {
       error: {
@@ -341,9 +343,10 @@ async function postSSE(baseUrl, route, body) {
         userMessage: error.userMessage || "The CAD agent returned an error.",
       },
       revision,
+      projectId,
     };
   }
-  return { revision };
+  return { revision, projectId };
 }
 
 async function verifyPackageArtifact(baseUrl, revision) {

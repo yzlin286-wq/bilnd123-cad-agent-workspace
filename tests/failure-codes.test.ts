@@ -22,6 +22,6 @@ test("userMessageForErrorCode returns safe user-facing messages", () => {
   assert.match(userMessageForErrorCode("LLM_JSON_ERROR"), /could not validate/);
   assert.match(userMessageForErrorCode("CAD_RUNNER_CRASH"), /CAD kernel could not complete/);
   assert.match(userMessageForErrorCode("VALIDATION_FAILED"), /failed geometry validation/);
-  assert.match(userMessageForErrorCode("RATE_LIMITED"), /wait a minute/);
+  assert.match(userMessageForErrorCode("RATE_LIMITED"), /wait about a minute/);
   assert.equal(userMessageForErrorCode("AGENT_RUN_FAILED", "Safe fallback."), "Safe fallback.");
 });

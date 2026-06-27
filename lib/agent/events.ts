@@ -1,6 +1,11 @@
 import type { CADArtifact, CADRevision, EngineeringSpec, ValidationReport, WorkstreamStatus } from "@/lib/agent/spec";
+import type { StoredProjectSummary } from "@/lib/project/types";
 
 export type AgentEvent =
+  | {
+      type: "project";
+      project: StoredProjectSummary;
+    }
   | {
       type: "run.started";
       runId: string;

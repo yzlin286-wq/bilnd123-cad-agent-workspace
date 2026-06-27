@@ -3,6 +3,7 @@ import { runCADKernel, CADRunnerNotConfiguredError } from "@/lib/cad/cad-runner-
 import { enforcePromptLimit, enforceRateLimit, friendlyJSONError } from "@/lib/server/request-guards";
 import { operationalErrorCode, userMessageForErrorCode } from "@/lib/server/failure-codes";
 import { appendRunHistory } from "@/lib/server/run-history";
+import { appendProjectError, appendProjectMessage, appendProjectRevision, getProject } from "@/lib/server/project-store";
 import type { EngineeringSpec } from "@/lib/agent/spec";
 
 export const runtime = "nodejs";
@@ -16,9 +17,9 @@ export async function POST(request: Request) {
     return rateLimitResponse;
   }
 
-  let body: { spec?: EngineeringSpec; prompt?: string };
+  let body: { spec?: EngineeringSpec; prompt?: string; projectId?: string };
   try {
-    body = (await request.json()) as { spec?: EngineeringSpec; prompt?: string };
+    body = (await request.json()) as { spec?: EngineeringSpec; prompt?: string; projectId?: string };
   } catch {
     await logRejectedRebuild(runId, startedAt, "INVALID_JSON");
     return friendlyJSONError("INVALID_JSON", userMessageForErrorCode("INVALID_JSON"), 400);
@@ -33,9 +34,23 @@ export async function POST(request: Request) {
     await logRejectedRebuild(runId, startedAt, "PROMPT_TOO_LONG", body.prompt);
     return promptLimitResponse;
   }
+  const project = body.projectId ? await getProject(body.projectId) : undefined;
+  if (project) {
+    await appendProjectMessage({
+      projectId: project.id,
+      role: "user",
+      content: body.prompt || "Updated parameters from the panel.",
+      route: "/api/cad/rebuild",
+    });
+  }
 
   try {
     const revision = await runCADKernel({ spec: body.spec, prompt: body.prompt });
+    await appendProjectRevision({
+      projectId: project?.id,
+      revision,
+      route: "/api/cad/rebuild",
+    });
     await appendRunHistory({
       route: "/api/cad/rebuild",
       runId,
@@ -55,6 +70,12 @@ export async function POST(request: Request) {
         durationMs: performance.now() - startedAt,
         errorCode: "CAD_ENGINE_NOT_CONNECTED",
       });
+      await appendProjectError({
+        projectId: project?.id,
+        route: "/api/cad/rebuild",
+        errorCode: "CAD_ENGINE_NOT_CONNECTED",
+        userMessage: userMessageForErrorCode("CAD_ENGINE_NOT_CONNECTED"),
+      });
       return Response.json(
         {
           error: "CAD_ENGINE_NOT_CONNECTED",
@@ -64,6 +85,7 @@ export async function POST(request: Request) {
       );
     }
     const errorCode = operationalErrorCode(error, "CAD_REBUILD_FAILED");
+    const userMessage = userMessageForErrorCode(errorCode, "The CAD engine could not rebuild this revision.");
     await appendRunHistory({
       route: "/api/cad/rebuild",
       runId,
@@ -72,10 +94,16 @@ export async function POST(request: Request) {
       durationMs: performance.now() - startedAt,
       errorCode,
     });
+    await appendProjectError({
+      projectId: project?.id,
+      route: "/api/cad/rebuild",
+      errorCode,
+      userMessage,
+    });
     return Response.json(
       {
         error: errorCode,
-        userMessage: userMessageForErrorCode(errorCode, "The CAD engine could not rebuild this revision."),
+        userMessage,
       },
       { status: 500 },
     );

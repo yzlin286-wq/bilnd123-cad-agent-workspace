@@ -214,7 +214,7 @@ textarea {
 
 .product-shell {
   display: grid;
-  grid-template-columns: 92px minmax(0, 1fr);
+  grid-template-columns: 220px minmax(0, 1fr);
   min-height: 100vh;
   padding: 18px;
   gap: 16px;
@@ -251,6 +251,54 @@ textarea {
 .rail button:hover {
   background: rgba(45, 212, 191, 0.1);
   color: var(--text);
+}
+
+.recent-rail {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.recent-rail > span {
+  margin: 10px 8px 2px;
+  color: var(--faint);
+  font-size: 12px;
+  font-weight: 760;
+  text-transform: uppercase;
+}
+
+.recent-rail > small {
+  padding: 0 8px;
+  color: var(--faint);
+  font-size: 12px;
+}
+
+.recent-rail button {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  text-align: left;
+}
+
+.recent-rail button.active {
+  background: rgba(45, 212, 191, 0.12);
+  color: var(--text);
+}
+
+.recent-rail strong,
+.recent-rail small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recent-rail strong {
+  font-size: 12px;
+}
+
+.recent-rail small {
+  color: var(--faint);
+  font-size: 11px;
 }
 
 .workspace-stage {
@@ -435,6 +483,13 @@ textarea {
   line-height: 1.45;
 }
 
+.friendly-error ul {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  color: #ffe4e6;
+  line-height: 1.45;
+}
+
 .approval-card.pass {
   border: 1px solid rgba(45, 212, 191, 0.34);
   background: rgba(45, 212, 191, 0.1);
@@ -514,6 +569,69 @@ textarea {
   display: flex;
   gap: 8px;
   padding: 0 22px 14px;
+}
+
+.feedback-panel {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 0 22px 14px;
+}
+
+.feedback-buttons {
+  display: flex;
+  gap: 6px;
+}
+
+.feedback-buttons button,
+.feedback-submit,
+.copy-source-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  min-height: 36px;
+  padding: 0 12px;
+  background: rgba(15, 23, 42, 0.48);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 720;
+}
+
+.feedback-buttons button.active,
+.feedback-submit {
+  border-color: rgba(45, 212, 191, 0.44);
+  color: var(--text);
+}
+
+.feedback-panel input {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  min-height: 36px;
+  padding: 0 13px;
+  background: rgba(8, 13, 25, 0.72);
+  color: var(--text);
+  outline: none;
+}
+
+.feedback-submit:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.feedback-status {
+  color: var(--green);
+  font-size: 12px;
+  font-weight: 760;
+  white-space: nowrap;
+}
+
+.feedback-status.fail {
+  color: var(--red);
 }
 
 .canvas-tabs button {
@@ -637,7 +755,20 @@ textarea {
   overflow: auto;
 }
 
-.file-list a {
+.file-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  border-radius: 16px;
+}
+
+.file-row.package {
+  border: 1px solid rgba(45, 212, 191, 0.36);
+  background: rgba(45, 212, 191, 0.1);
+}
+
+.file-row a {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 140px 72px 22px;
   align-items: center;
@@ -648,28 +779,113 @@ textarea {
   text-decoration: none;
 }
 
-.file-list a:hover {
+.file-row:hover {
   background: rgba(45, 212, 191, 0.08);
 }
 
-.file-list span,
-.file-list small {
+.file-row span,
+.file-row small {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.file-list small {
+.file-row small {
   color: var(--muted);
 }
 
-.file-list strong {
+.file-row strong {
   color: var(--faint);
   font-size: 12px;
 }
 
 .spin {
   animation: spin 1s linear infinite;
+}
+
+.admin-shell {
+  min-height: 100vh;
+  padding: 26px;
+}
+
+.admin-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  max-width: 1180px;
+  margin: 0 auto 18px;
+}
+
+.admin-header h1 {
+  margin: 0;
+  font-size: 34px;
+  letter-spacing: 0;
+}
+
+.admin-header > span {
+  color: var(--faint);
+  font-size: 12px;
+}
+
+.admin-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  max-width: 1180px;
+  margin: 0 auto 14px;
+}
+
+.admin-grid.two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.admin-card,
+.admin-panel {
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: rgba(8, 13, 25, 0.78);
+  box-shadow: var(--shadow);
+}
+
+.admin-card {
+  display: grid;
+  gap: 10px;
+  padding: 18px;
+}
+
+.admin-card.ok {
+  border-color: rgba(45, 212, 191, 0.38);
+}
+
+.admin-card.warn {
+  border-color: rgba(248, 195, 91, 0.46);
+}
+
+.admin-card span,
+.admin-panel p,
+.admin-panel li {
+  color: var(--muted);
+}
+
+.admin-card strong {
+  font-size: 28px;
+}
+
+.admin-panel {
+  padding: 18px;
+}
+
+.admin-panel h2 {
+  margin: 0 0 12px;
+  font-size: 18px;
+}
+
+.admin-panel ul {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding-left: 18px;
 }
 
 @keyframes spin {
@@ -692,6 +908,18 @@ textarea {
   .rail {
     flex-direction: row;
     min-height: auto;
+    overflow-x: auto;
+  }
+
+  .recent-rail {
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(150px, 190px);
+    align-items: stretch;
+  }
+
+  .recent-rail > span,
+  .recent-rail > small {
+    display: none;
   }
 
   .workspace-stage {
@@ -722,8 +950,12 @@ textarea {
   }
 
   .artifact-strip,
+  .admin-grid,
+  .admin-grid.two,
+  .feedback-panel,
   .parameter-controls label,
-  .file-list a {
+  .file-row,
+  .file-row a {
     grid-template-columns: 1fr;
   }
 

@@ -38,6 +38,8 @@ Record each run with timestamp, tester, prompt, expected result, actual result, 
 - `/api/health` must require Basic Auth and return no secrets after authentication.
 - `npm run runs:summary` should show realistic success/failure counts.
 - `npm run failures:export` should produce sanitized failure samples only.
+- After at least one successful run/revise sequence, refresh the browser and confirm the recent project and latest revision are restored.
+- Submit thumbs up/down feedback for a revision and confirm `npm run staging:report` includes feedback totals without secrets.
 
 ## Dry Run
 
