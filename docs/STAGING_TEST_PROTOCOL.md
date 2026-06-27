@@ -38,3 +38,36 @@ Record each run with timestamp, tester, prompt, expected result, actual result, 
 - `/api/health` must require Basic Auth and return no secrets after authentication.
 - `npm run runs:summary` should show realistic success/failure counts.
 - `npm run failures:export` should produce sanitized failure samples only.
+
+## Dry Run
+
+Dry-run the protocol list without model/API cost:
+
+```bash
+npm run staging:protocol -- --output outputs/protocol/latest.json
+```
+
+The output should include `executed: false` and `count: 20`.
+
+## Execute Against Staging
+
+Execute only after staging access is restricted and Basic Auth is configured:
+
+```bash
+STAGING_BASE_URL=http://staging-host.example.com:12601 \
+STAGING_BASIC_AUTH_USER=... \
+STAGING_BASIC_AUTH_PASSWORD=... \
+npm run staging:protocol -- --execute --output outputs/protocol/latest.json
+```
+
+This command calls the real model endpoint and real build123d runner. It can incur model/API cost and CAD runtime.
+
+`outputs/protocol/latest.json` contains:
+
+- `summary.total`, `summary.passed`, and `summary.failed`
+- `summary.expectedFailureCasesPassed` for unsupported/parameter-conflict cases that failed correctly
+- per-case `id`, `category`, `status`, `errorCode`, `revisionId`, artifact/package checks, and validation result
+
+It must not contain Basic Auth passwords or model API keys.
+
+If protocol cases fail, triage with `docs/FAILURE_TRIAGE.md`, then convert reproducible failures into unit tests, Python smoke cases, or protocol checklist updates.

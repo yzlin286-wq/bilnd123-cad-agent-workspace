@@ -37,7 +37,9 @@ async function loadReportModule() {
     generateStagingReport: (options: {
       logPath: string;
       smokePath: string;
+      protocolPath?: string;
       outputPath: string;
+      since?: string;
     }) => Promise<{ outputPath: string; smokePresent: boolean }>;
   };
 }
@@ -159,6 +161,7 @@ test("staging report writes sanitized markdown without prompts", async () => {
   const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "staging-report-"));
   const logPath = path.join(tempRoot, "runs.jsonl");
   const smokePath = path.join(tempRoot, "latest.json");
+  const protocolPath = path.join(tempRoot, "protocol.json");
   const outputPath = path.join(tempRoot, "staging-report.md");
 
   await fs.writeFile(
@@ -187,6 +190,7 @@ test("staging report writes sanitized markdown without prompts", async () => {
     smokePath,
     JSON.stringify({
       ok: true,
+      startedAt: "2026-06-27T00:00:01.000Z",
       durationMs: 999,
       health: { httpsConfigured: false, warning: "Staging is running without HTTPS domain; restrict access." },
       rev001: { id: "rev001", validationPassed: true },
@@ -195,14 +199,36 @@ test("staging report writes sanitized markdown without prompts", async () => {
     }),
     "utf8",
   );
+  await fs.writeFile(
+    protocolPath,
+    JSON.stringify({
+      executed: true,
+      startedAt: "2026-06-27T00:00:02.000Z",
+      generatedAt: "2026-06-27T00:00:03.000Z",
+      protocol: [{ id: 1 }],
+      results: [{ id: 1, category: "mounting_plate success", ok: true, expectedResult: "validation passes", status: "success" }],
+      summary: {
+        total: 1,
+        passed: 1,
+        failed: 0,
+        expectedFailureCasesPassed: 0,
+        expectedFailures: 0,
+        unexpectedFailures: 0,
+      },
+    }),
+    "utf8",
+  );
 
-  const result = await generateStagingReport({ logPath, smokePath, outputPath });
+  const result = await generateStagingReport({ logPath, smokePath, protocolPath, outputPath, since: "2026-06-27T00:00:00.000Z" });
   const markdown = await fs.readFile(result.outputPath, "utf8");
 
   assert.equal(result.smokePresent, true);
   assert.match(markdown, /Staging Observation Report/);
   assert.match(markdown, /Unexpected failures: 1/);
   assert.match(markdown, /Rev002: rev002/);
+  assert.match(markdown, /Protocol total: 1/);
+  assert.match(markdown, /Protocol passed: 1/);
+  assert.match(markdown, /New unexpected failures: 1/);
   assert.equal(markdown.includes("do not include this full prompt"), false);
 
   await fs.rm(tempRoot, { recursive: true, force: true });

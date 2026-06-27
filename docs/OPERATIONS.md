@@ -269,6 +269,22 @@ outputs/reports/staging-report.md
 
 It aggregates run summary, failure classification, and the latest smoke result without including full prompts or secrets.
 
+## 48-72 Hour Internal Trial Daily Routine
+
+During the controlled internal trial, run this sequence once per day and after any staging redeploy:
+
+```bash
+npm run smoke:staging -- --output outputs/smoke/latest.json
+npm run staging:protocol -- --execute --output outputs/protocol/latest.json
+npm run runs:classify
+npm run staging:report
+npm run failures:export
+```
+
+Use `npm run runs:classify -- --since <ISO timestamp>` to separate historical unexpected failures from failures introduced after a deployment.
+
+Read `outputs/reports/staging-report.md` before inviting more testers. If the report shows protocol failures or new unexpected failures, pause the trial and triage with `docs/FAILURE_TRIAGE.md`.
+
 ## Artifact Download Auth
 
 `GET /api/artifacts/[id]` is protected by the same staging Basic Auth middleware as the rest of the app. The middleware matcher covers `/api/artifacts/...` and excludes only Next.js static image/static asset paths.

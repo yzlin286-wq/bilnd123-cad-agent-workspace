@@ -6,6 +6,7 @@ import { listZipEntries } from "./zip-entries.mjs";
 const baseUrl = requiredEnv("STAGING_BASE_URL").replace(/\/$/, "");
 const authHeader = basicAuthHeader();
 const args = parseArgs(process.argv.slice(2));
+const startedAtIso = new Date().toISOString();
 const startedAt = Date.now();
 
 const initialPrompt = "Make a 120 x 80 x 4 mm mounting plate with four 4.5 mm holes, 10 mm edge offset, and 1 mm chamfer";
@@ -65,6 +66,7 @@ for (const kind of ["step", "stl", "validation", "package"]) {
 
 const result = {
   ok: true,
+  startedAt: startedAtIso,
   generatedAt: new Date().toISOString(),
   durationMs: Date.now() - startedAt,
   health: {

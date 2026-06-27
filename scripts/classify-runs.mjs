@@ -14,18 +14,19 @@ const UNEXPECTED_ERROR_CODES = new Set([
   "SSE_ABORT",
 ]);
 
-export async function classifyRunHistory({ logPath = DEFAULT_LOG_PATH } = {}) {
+export async function classifyRunHistory({ logPath = DEFAULT_LOG_PATH, since } = {}) {
   const runs = await readRunHistory(logPath);
-  return classifyRuns(runs);
+  return classifyRuns(filterRunsSince(runs, since), { since });
 }
 
-export function classifyRuns(runs) {
+export function classifyRuns(runs, { since } = {}) {
   const failures = runs.filter((run) => run.status === "failure" || run.validationPassed === false);
   const classified = failures.map((run) => classifyFailure(run));
   const expected = classified.filter((item) => item.classification === "expected_failure");
   const unexpected = classified.filter((item) => item.classification === "unexpected_failure");
 
   return {
+    since,
     totalRuns: runs.length,
     failureRuns: failures.length,
     expectedFailureCount: expected.length,
@@ -34,6 +35,18 @@ export function classifyRuns(runs) {
     unexpectedByReason: countBy(unexpected, (item) => item.reason),
     recentUnexpectedFailures: unexpected.slice(-RECENT_UNEXPECTED_LIMIT).reverse().map(summarizeClassifiedFailure),
   };
+}
+
+export function filterRunsSince(runs, since) {
+  if (!since) return runs;
+  const sinceMs = Date.parse(since);
+  if (!Number.isFinite(sinceMs)) {
+    throw new Error(`Invalid --since timestamp: ${since}`);
+  }
+  return runs.filter((run) => {
+    const timestampMs = Date.parse(run.timestamp || "");
+    return Number.isFinite(timestampMs) && timestampMs >= sinceMs;
+  });
 }
 
 export function classifyFailure(run) {
@@ -115,10 +128,13 @@ function countBy(items, keyFor) {
 }
 
 function parseArgs(argv) {
-  const args = { logPath: DEFAULT_LOG_PATH };
+  const args = { logPath: DEFAULT_LOG_PATH, since: undefined };
   for (let index = 0; index < argv.length; index += 1) {
     if (argv[index] === "--log") {
       args.logPath = path.resolve(argv[index + 1]);
+      index += 1;
+    } else if (argv[index] === "--since") {
+      args.since = argv[index + 1];
       index += 1;
     }
   }

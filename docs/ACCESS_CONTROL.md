@@ -4,6 +4,18 @@ This staging app is for short internal trials only. Current HTTP staging must be
 
 Do not commit real IP addresses, tester CIDRs, passwords, API keys, tunnel tokens, certificates, or private keys.
 
+## v0.9 Selected Trial Scheme
+
+For the controlled v0.9 internal trial, use the IP allowlist approach for the staging app port. This keeps the current HTTP + Basic Auth deployment path, avoids occupying ports `80` and `443`, and reduces exposure while there is no formal staging domain.
+
+Store the real allowlist only in the cloud firewall, host firewall, or server-only operations notes. Do not commit real tester IPs or CIDRs.
+
+After the allowlist is applied, set this server-only value and restart only this project:
+
+```bash
+STAGING_ACCESS_MODE=http_restricted
+```
+
 ## Current Rules
 
 - App-level Basic Auth must stay enabled for staging.
@@ -41,6 +53,17 @@ Use placeholder examples in notes and tickets. Keep real tester IPs outside git.
 - Verify authenticated `/api/health` returns `httpsConfigured`, `accessMode`, and no secrets.
 - Set `STAGING_ACCESS_MODE=http_restricted`.
 - Review the allowlist daily during the internal trial and remove it when the trial ends.
+
+## Verify Access Mode And Restriction
+
+Run these checks after applying the allowlist and restarting the app:
+
+- From an allowlisted network, unauthenticated `/api/health` returns `401`.
+- From an allowlisted network, authenticated `/api/health` returns `accessMode: "http_restricted"`.
+- From a non-allowlisted network or external TCP probe, the staging app port is unreachable.
+- Authenticated `/api/health` still reports `cadRunnerConfigured`, `llmConfigured`, `outputDirWritable`, and `supportedTemplates`.
+- An unauthenticated package artifact URL returns `401`.
+- Do not paste the real allowlisted IP or Basic Auth value into reports.
 
 ## Tailscale Checklist
 

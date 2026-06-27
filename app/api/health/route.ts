@@ -13,11 +13,8 @@ export async function GET() {
   const cadRunnerConfigured = isCADRunnerConfigured();
   const llmConfigured = isLLMConfigured();
   const httpsConfigured = Boolean(process.env.STAGING_DOMAIN?.trim());
-  const accessMode = stagingAccessMode();
-  const warning =
-    process.env.NODE_ENV === "production" && !httpsConfigured
-      ? "Staging is running without HTTPS domain; restrict access."
-      : undefined;
+  const accessMode = parseStagingAccessMode();
+  const warning = healthWarning({ nodeEnv: process.env.NODE_ENV, httpsConfigured });
 
   return Response.json({
     ok: outputDirWritable,
@@ -32,12 +29,24 @@ export async function GET() {
   });
 }
 
-function stagingAccessMode() {
-  const configured = process.env.STAGING_ACCESS_MODE?.trim();
+export function parseStagingAccessMode(value = process.env.STAGING_ACCESS_MODE) {
+  const configured = value?.trim();
   if (configured && accessModes.has(configured)) {
     return configured;
   }
   return "unknown";
+}
+
+export function healthWarning({
+  nodeEnv = process.env.NODE_ENV,
+  httpsConfigured,
+}: {
+  nodeEnv?: string;
+  httpsConfigured: boolean;
+}) {
+  return nodeEnv === "production" && !httpsConfigured
+    ? "Staging is running without HTTPS domain; restrict access."
+    : undefined;
 }
 
 async function canWriteOutputDir() {
