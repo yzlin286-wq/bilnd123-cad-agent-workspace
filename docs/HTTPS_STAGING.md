@@ -53,6 +53,8 @@ This repository includes a standalone HTTPS compose example:
 docker compose -f docker-compose.staging.https.yml --env-file .env up -d --build
 ```
 
+This HTTPS compose passes `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` as a Docker build arg for the Next.js client bundle. If the Clerk publishable key changes, rerun the compose command with `--build`; a restart alone can leave stale client-side auth configuration.
+
 It uses:
 
 - `deploy/Caddyfile.staging`

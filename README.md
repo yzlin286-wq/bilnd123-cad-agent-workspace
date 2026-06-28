@@ -115,6 +115,8 @@ CAD_OUTPUT_RETENTION_HOURS=72
 CAD_OUTPUT_MAX_BYTES=1073741824
 ```
 
+For Docker staging, `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` is also a build-time value for the Next.js client bundle. After adding or rotating Clerk publishable keys, rebuild the image with the compose `--env-file .env up -d --build` flow; a container restart alone is not enough.
+
 For local build123d validation on Windows:
 
 ```powershell

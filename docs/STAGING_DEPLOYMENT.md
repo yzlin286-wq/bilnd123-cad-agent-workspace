@@ -57,6 +57,8 @@ CAD_OUTPUT_MAX_BYTES=1073741824
 
 Never prefix model keys with `NEXT_PUBLIC_`. Browser code must not receive `CAD_AGENT_API_KEY`.
 
+`NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` is public but must be available during `next build` so the Clerk client bundle can initialize. The staging compose files pass it as a Docker build arg. After adding or rotating Clerk keys, rebuild the image with `--env-file .env up -d --build`; do not rely on a container restart alone.
+
 ## Docker Compose
 
 ```bash

@@ -24,6 +24,8 @@ RUN python3 -m venv /app/.venv \
   && /app/.venv/bin/python -m pip install --index-url "$PIP_INDEX_URL" -r requirements.txt
 
 FROM deps AS builder
+ARG NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=
+ENV NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=$NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
 COPY . .
 RUN npm run build
 
