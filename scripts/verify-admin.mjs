@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 
-import { createClerkClient } from "@clerk/backend";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -83,6 +82,7 @@ async function main() {
   let error;
   if (clerkSecret && adminEmail) {
     try {
+      const { createClerkClient } = await import("@clerk/backend");
       const clerk = createClerkClient({ secretKey: clerkSecret });
       const result = await clerk.users.getUserList({ emailAddress: [adminEmail], limit: 1 });
       user = result.data?.[0];

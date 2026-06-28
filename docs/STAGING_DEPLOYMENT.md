@@ -215,6 +215,15 @@ V12_ADMIN_EMAIL=admin@example.com \
 npm run admin:verify -- --output outputs/reports/v12-admin-verify.json
 ```
 
+On the staging host, prefer the container because the deployment checkout does not need host-side `node_modules`:
+
+```bash
+docker compose -f docker-compose.staging.yml exec cad-agent \
+  npm run admin:verify -- --output /app/logs/v12-admin-verify.json
+docker compose -f docker-compose.staging.yml exec cad-agent \
+  cat /app/logs/v12-admin-verify.json > outputs/reports/v12-admin-verify.json
+```
+
 Then run the strict handoff gate:
 
 ```bash

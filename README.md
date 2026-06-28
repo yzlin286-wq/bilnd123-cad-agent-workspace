@@ -209,6 +209,13 @@ V12_ADMIN_EMAIL=admin@example.com \
 npm run admin:verify -- --output outputs/reports/v12-admin-verify.json
 ```
 
+On the staging host, run this inside the application container unless you have also installed host-side npm dependencies:
+
+```bash
+docker compose -f docker-compose.staging.yml exec cad-agent \
+  npm run admin:verify -- --output /app/logs/v12-admin-verify.json
+```
+
 Run the v1.2 handoff gate only when a real HTTPS domain and Clerk keys are configured:
 
 ```bash
