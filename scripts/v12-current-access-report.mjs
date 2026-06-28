@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import { isIP } from "node:net";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -18,6 +18,7 @@ export function evaluateCurrentAccessReport({
   adminUser,
   passwordDelivery,
   credentialPath,
+  credentialInspection,
   healthUnauthStatus,
   healthStatus,
   health,
@@ -36,6 +37,7 @@ export function evaluateCurrentAccessReport({
   const normalizedBaseUrl = safeUrl(baseUrl);
   const normalizedDomainUrl = safeUrl(domainUrl);
   const normalizedIpFallback = safeUrl(ipFallback);
+  const credential = record(credentialInspection);
 
   const temporaryAccessOk =
     healthUnauthStatus === 401 &&
@@ -108,8 +110,18 @@ export function evaluateCurrentAccessReport({
     admin: {
       user: stringValue(adminUser),
       passwordDelivery: passwordDeliveryText(passwordDelivery, credentialPath),
-      passwordRotationRequired: Boolean(passwordDelivery || credentialPath),
+      passwordRotationRequired: credential.checked === true ? credential.rotationRequired === true : Boolean(passwordDelivery || credentialPath),
       temporaryBasicAuthOnly: auth.clerkConfigured !== true,
+      credential: {
+        path: stringValue(credentialPath),
+        checked: credential.checked === true,
+        exists: credential.exists === true,
+        privatePermissions: credential.privatePermissions === true,
+        userMatches: credential.userMatches === true,
+        passwordPresent: credential.passwordPresent === true,
+        rotationRequired: credential.rotationRequired === true,
+        mode: stringValue(credential.mode),
+      },
     },
     v12Handoff: {
       ready: handoffRecord.ok === true && blockers.length === 0,
@@ -129,6 +141,7 @@ export function renderCurrentAccessReport(report) {
   const dataLayer = record(access.dataLayer);
   const build = record(access.build);
   const admin = record(report?.admin);
+  const credential = record(admin.credential);
   const handoff = record(report?.v12Handoff);
   const blockers = arrayValue(handoff.blockers);
   const lines = [
@@ -164,6 +177,10 @@ export function renderCurrentAccessReport(report) {
     `- Admin user: ${stringValue(admin.user) || "not declared"}`,
     `- Admin password: ${stringValue(admin.passwordDelivery) || "not included in report"}`,
     `- Password rotation required: ${admin.passwordRotationRequired === true ? "yes" : "not verified"}`,
+    `- Credential file exists: ${credential.checked === true ? yesNo(credential.exists) : "not checked"}`,
+    `- Credential file private: ${credential.checked === true ? yesNo(credential.privatePermissions) : "not checked"}`,
+    `- Credential user matches admin: ${credential.checked === true ? yesNo(credential.userMatches) : "not checked"}`,
+    `- Credential password present: ${credential.checked === true ? yesNo(credential.passwordPresent) : "not checked"}`,
     `- Clerk SaaS admin login: ${admin.temporaryBasicAuthOnly === true ? "not configured; Basic Auth is only the outer staging gate" : "configured"}`,
     "",
     "## Auth And Data",
@@ -195,6 +212,7 @@ async function main() {
   const adminResponse = probeBaseUrl ? await requestText(new URL("/admin", probeBaseUrl), authHeader ? { authorization: authHeader } : {}) : {};
   const appResponse = probeBaseUrl ? await requestText(new URL("/app", probeBaseUrl), authHeader ? { authorization: authHeader } : {}) : {};
   const handoff = options.handoff ? await readJsonIfPresent(options.handoff) : undefined;
+  const credentialInspection = runtime.credentialPath ? await inspectCredentialFile(runtime.credentialPath, runtime.adminUser) : undefined;
   const report = evaluateCurrentAccessReport({
     baseUrl: runtime.baseUrl,
     domainUrl: runtime.domainUrl,
@@ -203,6 +221,7 @@ async function main() {
     adminUser: runtime.adminUser,
     passwordDelivery: runtime.passwordDelivery,
     credentialPath: runtime.credentialPath,
+    credentialInspection,
     healthUnauthStatus: healthUnauth.status,
     healthStatus: healthAuth.status,
     health: healthAuth.body,
@@ -232,6 +251,50 @@ export function resolveCurrentAccessRuntimeOptions(options = {}, env = {}) {
     credentialPath: options.credentialPath || env.V12_ADMIN_CREDENTIAL_PATH || env.ADMIN_BOOTSTRAP_CREDENTIAL_PATH || "",
     passwordDelivery: options.passwordDelivery || env.V12_ADMIN_PASSWORD_DELIVERY || env.ADMIN_BOOTSTRAP_PASSWORD_DELIVERY || "",
   };
+}
+
+export async function inspectCredentialFile(filePath, expectedUser) {
+  try {
+    const absolutePath = path.resolve(filePath);
+    const fileStat = await stat(absolutePath);
+    const permissions = fileStat.mode & 0o777;
+    const text = fileStat.isFile() ? await readFile(absolutePath, "utf8") : "";
+    const credential = parseCredentialFile(text);
+    const normalizedExpectedUser = normalizeIdentity(expectedUser);
+    return {
+      checked: true,
+      exists: fileStat.isFile(),
+      privatePermissions: fileStat.isFile() && (permissions & 0o077) === 0,
+      userMatches: Boolean(normalizedExpectedUser && credential.user === normalizedExpectedUser),
+      passwordPresent: credential.passwordPresent === true,
+      rotationRequired: credential.rotationRequired === true,
+      mode: `0${permissions.toString(8).padStart(3, "0")}`,
+    };
+  } catch {
+    return {
+      checked: true,
+      exists: false,
+      privatePermissions: false,
+      userMatches: false,
+      passwordPresent: false,
+      rotationRequired: false,
+      mode: "",
+    };
+  }
+}
+
+function parseCredentialFile(text) {
+  const parsed = { user: "", passwordPresent: false, rotationRequired: false };
+  for (const line of String(text || "").split(/\r?\n/)) {
+    const separator = line.indexOf("=");
+    if (separator < 0) continue;
+    const key = line.slice(0, separator).trim().toLowerCase();
+    const value = line.slice(separator + 1).trim();
+    if (key === "email" || key === "user") parsed.user = normalizeIdentity(value);
+    if (key === "password") parsed.passwordPresent = Boolean(value);
+    if (key === "rotation_required") parsed.rotationRequired = value.toLowerCase() === "yes";
+  }
+  return parsed;
 }
 
 async function requestJson(url, headers) {
@@ -369,6 +432,10 @@ function arrayOfStrings(value) {
 
 function stringValue(value) {
   return typeof value === "string" ? value : "";
+}
+
+function normalizeIdentity(value) {
+  return typeof value === "string" ? value.trim().toLowerCase() : "";
 }
 
 function normalizeCommitSha(value) {

@@ -51,6 +51,16 @@ export type CurrentAccessReport = {
     passwordDelivery: string;
     passwordRotationRequired: boolean;
     temporaryBasicAuthOnly: boolean;
+    credential: {
+      path: string;
+      checked: boolean;
+      exists: boolean;
+      privatePermissions: boolean;
+      userMatches: boolean;
+      passwordPresent: boolean;
+      rotationRequired: boolean;
+      mode: string;
+    };
   };
   v12Handoff: {
     ready: boolean;
@@ -77,3 +87,15 @@ export function resolveCurrentAccessRuntimeOptions(
   credentialPath: string;
   passwordDelivery: string;
 };
+export function inspectCredentialFile(
+  filePath: string,
+  expectedUser?: string,
+): Promise<{
+  checked: boolean;
+  exists: boolean;
+  privatePermissions: boolean;
+  userMatches: boolean;
+  passwordPresent: boolean;
+  rotationRequired: boolean;
+  mode: string;
+}>;

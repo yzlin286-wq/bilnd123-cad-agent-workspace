@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
+import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import test from "node:test";
 import {
   evaluateCurrentAccessReport,
+  inspectCredentialFile,
   renderCurrentAccessReport,
   resolveCurrentAccessRuntimeOptions,
 } from "../scripts/v12-current-access-report.mjs";
@@ -14,6 +18,15 @@ test("current access report accepts temporary HTTP Basic Auth access but rejects
     adminUser: "cad-admin",
     passwordDelivery: "server_file",
     credentialPath: "/opt/bilnd123-cad-agent-workspace/admin-credential.txt",
+    credentialInspection: {
+      checked: true,
+      exists: true,
+      privatePermissions: true,
+      userMatches: true,
+      passwordPresent: true,
+      rotationRequired: true,
+      mode: "0600",
+    },
     healthUnauthStatus: 401,
     healthStatus: 200,
     adminStatus: 307,
@@ -45,6 +58,11 @@ test("current access report accepts temporary HTTP Basic Auth access but rejects
   assert.equal(report.currentAccess.temporarySmokeAccessReady, true);
   assert.equal(report.currentAccess.appBlockedWithoutSaasSession, true);
   assert.equal(report.currentAccess.adminBlockedWithoutSaasSession, true);
+  assert.equal(report.admin.passwordRotationRequired, true);
+  assert.equal(report.admin.credential.exists, true);
+  assert.equal(report.admin.credential.privatePermissions, true);
+  assert.equal(report.admin.credential.userMatches, true);
+  assert.equal(report.admin.credential.passwordPresent, true);
   assert.equal(report.v12Handoff.ready, false);
   assert.match(report.v12Handoff.blockers.map((blocker) => blocker.id).join(","), /domain_https_missing/);
   assert.match(report.v12Handoff.blockers.map((blocker) => blocker.id).join(","), /clerk_not_configured/);
@@ -56,6 +74,10 @@ test("current access report accepts temporary HTTP Basic Auth access but rejects
   assert.match(markdown, /Build commit: 4d7d7c3/);
   assert.match(markdown, /\/app blocked without SaaS session: yes/);
   assert.match(markdown, /\/admin blocked without SaaS session: yes/);
+  assert.match(markdown, /Credential file exists: yes/);
+  assert.match(markdown, /Credential file private: yes/);
+  assert.match(markdown, /Credential user matches admin: yes/);
+  assert.match(markdown, /Credential password present: yes/);
   assert.match(markdown, /Clerk SaaS admin login: not configured; Basic Auth is only the outer staging gate/);
 });
 
@@ -110,4 +132,52 @@ test("current access report separates public URL from private probe URL", () => 
   assert.equal(resolved.ip, "43.138.153.37");
   assert.equal(resolved.adminUser, "cad-admin");
   assert.equal(resolved.passwordDelivery, "server_file");
+});
+
+test("current access report inspects credential file without exposing password", async () => {
+  const outputDir = mkdtempSync(path.join(tmpdir(), "current-access-credential-"));
+  const credentialPath = path.join(outputDir, "admin-credential.txt");
+
+  try {
+    writeFileSync(
+      credentialPath,
+      ["CAD Agent staging admin credential", "email=cad-admin", "password=one-time-secret", "rotation_required=yes", ""].join("\n"),
+      "utf8",
+    );
+    chmodSync(credentialPath, 0o600);
+
+    const inspection = await inspectCredentialFile(credentialPath, "cad-admin");
+    assert.equal(inspection.exists, true);
+    assert.equal(inspection.userMatches, true);
+    assert.equal(inspection.passwordPresent, true);
+    assert.equal(inspection.rotationRequired, true);
+    if (process.platform !== "win32") {
+      assert.equal(inspection.privatePermissions, true);
+      assert.equal(inspection.mode, "0600");
+    }
+
+    const report = evaluateCurrentAccessReport({
+      adminUser: "cad-admin",
+      credentialPath,
+      credentialInspection: inspection,
+      healthUnauthStatus: 401,
+      healthStatus: 200,
+      adminStatus: 307,
+      appStatus: 307,
+      health: {
+        app: "ok",
+        cadRunnerConfigured: true,
+        llmConfigured: true,
+        outputDirWritable: true,
+        auth: { clerkConfigured: false },
+        dataLayer: { mode: "postgres", productionReady: true, connected: true, schemaReady: true },
+      },
+    });
+
+    const markdown = renderCurrentAccessReport(report);
+    assert.equal(markdown.includes("one-time-secret"), false);
+    assert.match(markdown, /Credential password present: yes/);
+  } finally {
+    rmSync(outputDir, { recursive: true, force: true });
+  }
 });

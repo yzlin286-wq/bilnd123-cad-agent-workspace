@@ -294,7 +294,7 @@ V12_ADMIN_CREDENTIAL_PATH=/opt/bilnd123-cad-agent-workspace/admin-credential.txt
 npm run handoff:current-access -- --handoff outputs/reports/v12-handoff-check.json
 ```
 
-When running the report inside the container, use `V12_PROBE_BASE_URL` or `--probe-base-url` for the local probe address and `V12_PUBLIC_BASE_URL` or `--base-url` for the real address to show the operator. The current-access report is for operator handoff of a restricted staging URL only. It explicitly reports `Final v1.2 handoff: not ready` until HTTPS/domain, Clerk, and admin-flow evidence pass the strict gate.
+When running the report inside the container, use `V12_PROBE_BASE_URL` or `--probe-base-url` for the local probe address and `V12_PUBLIC_BASE_URL` or `--base-url` for the real address to show the operator. If `V12_ADMIN_CREDENTIAL_PATH` is set, the report checks only safe credential-file evidence: file existence, private permissions, admin identity match, password presence, and rotation marker. It never prints the password. The current-access report is for operator handoff of a restricted staging URL only. It explicitly reports `Final v1.2 handoff: not ready` until HTTPS/domain, Clerk, and admin-flow evidence pass the strict gate.
 
 Then generate the sanitized handoff report:
 
