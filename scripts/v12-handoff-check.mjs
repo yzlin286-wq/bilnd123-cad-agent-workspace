@@ -236,6 +236,8 @@ export function evaluateV12Handoff({
         connected: dataLayer.connected === true,
         projectStore: stringValue(dataLayer.projectStore),
         schemaReady: dataLayer.schemaReady === true,
+        requiredTables: arrayOfStrings(dataLayer.requiredTables),
+        missingTables: arrayOfStrings(dataLayer.missingTables),
       },
       build: {
         expectedCommit: normalizedExpectedCommit,

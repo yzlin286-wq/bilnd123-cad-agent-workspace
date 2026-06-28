@@ -98,6 +98,8 @@ export function evaluateCurrentAccessReport({
         productionReady: dataLayer.productionReady === true,
         connected: dataLayer.connected === true,
         schemaReady: dataLayer.schemaReady === true,
+        requiredTables: arrayOfStrings(dataLayer.requiredTables),
+        missingTables: arrayOfStrings(dataLayer.missingTables),
       },
       build: {
         deployedCommit: normalizeCommitSha(build.commitSha),
@@ -172,6 +174,8 @@ export function renderCurrentAccessReport(report) {
     `- Data layer: ${stringValue(dataLayer.mode) || "unknown"}, production ready ${yesNo(dataLayer.productionReady)}, connected ${yesNo(
       dataLayer.connected,
     )}, schema ready ${yesNo(dataLayer.schemaReady)}`,
+    `- Required Postgres tables: ${arrayOfStrings(dataLayer.requiredTables).join(", ") || "not reported"}`,
+    `- Missing Postgres tables: ${arrayOfStrings(dataLayer.missingTables).join(", ") || "none"}`,
     "",
     "## Final Handoff Blockers",
     "",

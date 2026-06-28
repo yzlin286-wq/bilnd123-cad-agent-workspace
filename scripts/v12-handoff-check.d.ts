@@ -36,6 +36,8 @@ export type V12HandoffResult = {
       connected: boolean;
       projectStore: string;
       schemaReady: boolean;
+      requiredTables: string[];
+      missingTables: string[];
     };
     build: {
       expectedCommit: string;

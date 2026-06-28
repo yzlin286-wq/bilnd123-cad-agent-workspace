@@ -7,6 +7,8 @@ export type DataLayerStatus = {
   productionReady: boolean;
   connected?: boolean;
   schemaReady?: boolean;
+  requiredTables?: string[];
+  missingTables?: string[];
   todo?: string;
 };
 
@@ -20,6 +22,8 @@ export async function getDataLayerStatus(): Promise<DataLayerStatus> {
       productionReady: health.connected && health.schemaReady,
       connected: health.connected,
       schemaReady: health.schemaReady,
+      requiredTables: health.requiredTables,
+      missingTables: health.missingTables,
       todo: health.connected && health.schemaReady ? undefined : "Run npm run db:migrate and verify DATABASE_URL.",
     };
   }

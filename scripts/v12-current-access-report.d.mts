@@ -39,6 +39,8 @@ export type CurrentAccessReport = {
       productionReady: boolean;
       connected: boolean;
       schemaReady: boolean;
+      requiredTables: string[];
+      missingTables: string[];
     };
     build: {
       deployedCommit: string;

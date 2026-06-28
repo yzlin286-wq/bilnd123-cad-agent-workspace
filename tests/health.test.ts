@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { authPosture, deploymentInfo, healthWarning, isHttpsConfigured, parseStagingAccessMode } from "../app/api/health/route";
 import { getDataLayerStatus } from "../lib/server/data-layer";
+import { missingRequiredPostgresTables, REQUIRED_POSTGRES_TABLES } from "../lib/server/postgres";
 
 test("parseStagingAccessMode accepts only documented access modes", () => {
   assert.equal(parseStagingAccessMode("https"), "https");
@@ -75,4 +76,10 @@ test("data layer reports JSON fallback when DATABASE_URL is absent", async () =>
       process.env.DATABASE_URL = previousDatabaseUrl;
     }
   }
+});
+
+test("Postgres schema health requires every v1.2 persistence table", () => {
+  assert.deepEqual(missingRequiredPostgresTables(REQUIRED_POSTGRES_TABLES), []);
+  assert.deepEqual(missingRequiredPostgresTables(["projects", "messages", "revisions", "artifacts", "feedback"]), ["usage_events"]);
+  assert.deepEqual(missingRequiredPostgresTables(["PROJECTS", "messages"]), ["revisions", "artifacts", "feedback", "usage_events"]);
 });

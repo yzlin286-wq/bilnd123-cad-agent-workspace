@@ -40,6 +40,7 @@ export function renderV12HandoffReport(report) {
     )}, output writable ${yesNo(health.outputDirWritable)}`,
     `- Supported templates: ${arrayValue(health.supportedTemplates).join(", ") || "unknown"}`,
     `- Data layer: ${stringValue(dataLayer.mode) || "unknown"}, production ready ${yesNo(dataLayer.productionReady)}`,
+    `- Missing Postgres tables: ${arrayValue(dataLayer.missingTables).join(", ") || "none"}`,
     `- Build commit: ${stringValue(build.deployedCommit) || "not reported"}${build.expectedCommit ? ` (expected ${stringValue(build.expectedCommit)})` : ""}`,
     "",
     "## Admin",
