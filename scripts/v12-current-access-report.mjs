@@ -286,11 +286,14 @@ export async function inspectCredentialFile(filePath, expectedUser) {
 function parseCredentialFile(text) {
   const parsed = { user: "", passwordPresent: false, rotationRequired: false };
   for (const line of String(text || "").split(/\r?\n/)) {
-    const separator = line.indexOf("=");
+    const equalsSeparator = line.indexOf("=");
+    const colonSeparator = line.indexOf(":");
+    const separator =
+      equalsSeparator >= 0 && (colonSeparator < 0 || equalsSeparator < colonSeparator) ? equalsSeparator : colonSeparator;
     if (separator < 0) continue;
     const key = line.slice(0, separator).trim().toLowerCase();
     const value = line.slice(separator + 1).trim();
-    if (key === "email" || key === "user") parsed.user = normalizeIdentity(value);
+    if (key === "email" || key === "user" || key === "username") parsed.user = normalizeIdentity(value);
     if (key === "password") parsed.passwordPresent = Boolean(value);
     if (key === "rotation_required") parsed.rotationRequired = value.toLowerCase() === "yes";
   }

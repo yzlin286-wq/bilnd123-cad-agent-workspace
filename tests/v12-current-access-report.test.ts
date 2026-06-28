@@ -181,3 +181,32 @@ test("current access report inspects credential file without exposing password",
     rmSync(outputDir, { recursive: true, force: true });
   }
 });
+
+test("current access report supports colon-delimited Basic Auth credential handoff files", async () => {
+  const outputDir = mkdtempSync(path.join(tmpdir(), "current-access-basic-auth-credential-"));
+  const credentialPath = path.join(outputDir, "admin-credential.txt");
+
+  try {
+    writeFileSync(
+      credentialPath,
+      [
+        "Temporary HTTP staging Basic Auth credential",
+        "username: cad-admin",
+        "password: one-time-secret",
+        "access_mode: http_restricted",
+        "rotation_required: yes",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+    chmodSync(credentialPath, 0o600);
+
+    const inspection = await inspectCredentialFile(credentialPath, "cad-admin");
+    assert.equal(inspection.exists, true);
+    assert.equal(inspection.userMatches, true);
+    assert.equal(inspection.passwordPresent, true);
+    assert.equal(inspection.rotationRequired, true);
+  } finally {
+    rmSync(outputDir, { recursive: true, force: true });
+  }
+});
