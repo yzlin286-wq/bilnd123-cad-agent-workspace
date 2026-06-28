@@ -41,7 +41,7 @@ export function sanitizePrompt(prompt, maxPromptChars = DEFAULT_MAX_PROMPT_CHARS
   const sanitized = String(prompt)
     .replace(/\bsk-[A-Za-z0-9_-]+\b/g, "[redacted-api-key]")
     .replace(/Bearer\s+[A-Za-z0-9._~+/=-]+/gi, "Bearer [redacted]")
-    .replace(/Basic\s+[A-Za-z0-9+/=-]+/gi, "Basic [redacted]")
+    .replace(/Basic\s+(?!Auth\b)[A-Za-z0-9+/=-]{6,}/gi, "Basic [redacted]")
     .replace(/(password|api[_-]?key|token|secret)\s*[:=]\s*\S+/gi, "$1=[redacted]")
     .replace(/\s+/g, " ")
     .trim();

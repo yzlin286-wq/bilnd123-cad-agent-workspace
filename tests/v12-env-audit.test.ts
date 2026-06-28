@@ -40,7 +40,15 @@ ADMIN_BOOTSTRAP_CREDENTIAL_PATH=/opt/app/admin-credential.txt
   const markdown = renderV12EnvAudit(report);
   assert.match(markdown, /Status: not ready/);
   assert.match(markdown, /APP_COMMIT_SHA: no/);
+  assert.match(markdown, /Basic Auth gate: yes/);
   assert.equal(markdown.includes("secret-value"), false);
+
+  const redacted = renderV12EnvAudit({
+    ...report,
+    checks: [...report.checks, { id: "auth_header", ok: false, message: "Header Basic QWxhZGRpbjpvcGVuIHNlc2FtZQ==" }],
+  });
+  assert.match(redacted, /Header Basic \[redacted\]/);
+  assert.equal(redacted.includes("QWxhZGRpbjpvcGVuIHNlc2FtZQ=="), false);
 });
 
 test("v1.2 env audit accepts complete handoff env without leaking secrets", () => {

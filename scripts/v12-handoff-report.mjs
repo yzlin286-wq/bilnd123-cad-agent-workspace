@@ -147,7 +147,7 @@ function redactSecrets(text) {
   return text
     .replace(/sk-[A-Za-z0-9_-]{8,}/g, "[redacted]")
     .replace(/\bBearer\s+[A-Za-z0-9._~+/-]+=*/gi, "Bearer [redacted]")
-    .replace(/\bBasic\s+[A-Za-z0-9._~+/-]+=*/gi, "Basic [redacted]")
+    .replace(/\bBasic\s+(?!Auth\b)[A-Za-z0-9._~+/-]{6,}=*/gi, "Basic [redacted]")
     .replace(/(password=)[^\s]+/gi, "$1[redacted]")
     .replace(/(STAGING_BASIC_AUTH_PASSWORD=)[^\s]+/gi, "$1[redacted]")
     .replace(/(CLERK_SECRET_KEY=)[^\s]+/gi, "$1[redacted]")
