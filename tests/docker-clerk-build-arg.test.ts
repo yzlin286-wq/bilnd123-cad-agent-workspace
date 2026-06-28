@@ -14,4 +14,6 @@ test("Docker build receives Clerk publishable key for Next client bundles", () =
     httpsCompose,
     /NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:\s*\$\{NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:\?set NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY\}/,
   );
+  assert.match(httpsCompose, /STAGING_ACCESS_MODE:\s*\$\{STAGING_ACCESS_MODE:-https\}/);
+  assert.match(httpsCompose, /STAGING_HTTPS_ENABLED:\s*\$\{STAGING_HTTPS_ENABLED:-1\}/);
 });
