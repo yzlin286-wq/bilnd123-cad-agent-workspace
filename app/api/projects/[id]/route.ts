@@ -1,10 +1,10 @@
-import { canAccessProject, forbiddenResponse, requireRequestAuth } from "@/lib/server/auth";
+import { canAccessProject, forbiddenResponse, requireSaasRequestAuth } from "@/lib/server/auth";
 import { getProject } from "@/lib/server/project-store";
 
 export const runtime = "nodejs";
 
 export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
-  const authResult = await requireRequestAuth(request);
+  const authResult = await requireSaasRequestAuth(request);
   if (authResult.response) return authResult.response;
   const { id } = await context.params;
   const project = await getProject(id);

@@ -45,6 +45,18 @@ export async function requireRequestAuth(request: Request) {
   return { auth, response: undefined };
 }
 
+export async function requireSaasRequestAuth(request: Request) {
+  const auth = await getRequestAuthContext(request);
+  if (!auth.isAuthenticated || !auth.userId || !isSaasIdentity(auth)) {
+    return { auth, response: unauthorizedResponse() };
+  }
+  return { auth, response: undefined };
+}
+
+export function isSaasIdentity(auth: AuthContext) {
+  return auth.source === "clerk" || auth.source === "dev_bypass";
+}
+
 export function unauthorizedResponse() {
   return Response.json({ error: "AUTH_REQUIRED", userMessage: "Sign in to access this CAD workspace." }, { status: 401 });
 }

@@ -8,11 +8,14 @@ import {
   appRouteAccess,
   canAccessProject,
   getRequestAuthContext,
+  requireSaasRequestAuth,
   safeAuthReturnPath,
   signInRedirectPath,
   signUpRedirectPath,
 } from "../lib/server/auth";
 import { GET as getArtifact } from "../app/api/artifacts/[id]/route";
+import { GET as getProjects } from "../app/api/projects/route";
+import { GET as getProjectDetail } from "../app/api/projects/[id]/route";
 
 const PROJECT_STORE_PATH = path.resolve(process.cwd(), "logs", "projects.json");
 
@@ -112,6 +115,7 @@ test("Basic Auth is not a SaaS identity once Clerk is configured", async () => {
     "STAGING_BASIC_AUTH_USER",
     "STAGING_BASIC_AUTH_PASSWORD",
     "SAAS_DEV_AUTH_BYPASS",
+    "DATABASE_URL",
   ]);
   try {
     process.env.CLERK_SECRET_KEY = "sk_test_fake";
@@ -125,6 +129,61 @@ test("Basic Auth is not a SaaS identity once Clerk is configured", async () => {
 
     assert.equal(auth.isAuthenticated, false);
     assert.equal(auth.source, undefined);
+  } finally {
+    restoreEnv(envSnapshot);
+  }
+});
+
+test("project APIs reject Basic Auth-only staging identity", async () => {
+  const envSnapshot = snapshotEnv([
+    "CLERK_SECRET_KEY",
+    "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY",
+    "STAGING_BASIC_AUTH_USER",
+    "STAGING_BASIC_AUTH_PASSWORD",
+    "SAAS_DEV_AUTH_BYPASS",
+  ]);
+  try {
+    clearAuthEnv();
+    process.env.STAGING_BASIC_AUTH_USER = "cad";
+    process.env.STAGING_BASIC_AUTH_PASSWORD = "secret";
+
+    const header = `Basic ${Buffer.from("cad:secret").toString("base64")}`;
+    const list = await getProjects(new Request("http://test/api/projects", { headers: { authorization: header } }));
+    assert.equal(list.status, 401);
+
+    const detail = await getProjectDetail(new Request("http://test/api/projects/project-authz", { headers: { authorization: header } }), {
+      params: Promise.resolve({ id: "project-authz" }),
+    });
+    assert.equal(detail.status, 401);
+  } finally {
+    restoreEnv(envSnapshot);
+  }
+});
+
+test("SaaS auth gate allows local dev bypass only when explicitly enabled", async () => {
+  const envSnapshot = snapshotEnv([
+    "CLERK_SECRET_KEY",
+    "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY",
+    "STAGING_BASIC_AUTH_USER",
+    "STAGING_BASIC_AUTH_PASSWORD",
+    "SAAS_DEV_AUTH_BYPASS",
+    "SAAS_DEV_USER_ID",
+    "DATABASE_URL",
+  ]);
+  try {
+    clearAuthEnv();
+    process.env.STAGING_BASIC_AUTH_USER = "cad";
+    process.env.STAGING_BASIC_AUTH_PASSWORD = "secret";
+    const header = `Basic ${Buffer.from("cad:secret").toString("base64")}`;
+    const rejected = await requireSaasRequestAuth(new Request("http://test/api/projects", { headers: { authorization: header } }));
+    assert.equal(rejected.response?.status, 401);
+
+    process.env.SAAS_DEV_AUTH_BYPASS = "1";
+    process.env.SAAS_DEV_USER_ID = "local-dev";
+    const allowed = await requireSaasRequestAuth(new Request("http://test/api/projects"));
+    assert.equal(allowed.response, undefined);
+    assert.equal(allowed.auth.source, "dev_bypass");
+    assert.equal(allowed.auth.userId, "local-dev");
   } finally {
     restoreEnv(envSnapshot);
   }

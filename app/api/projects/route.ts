@@ -1,10 +1,10 @@
-import { requireRequestAuth } from "@/lib/server/auth";
+import { requireSaasRequestAuth } from "@/lib/server/auth";
 import { listProjects } from "@/lib/server/project-store";
 
 export const runtime = "nodejs";
 
 export async function GET(request: Request) {
-  const authResult = await requireRequestAuth(request);
+  const authResult = await requireSaasRequestAuth(request);
   if (authResult.response) return authResult.response;
   const url = new URL(request.url);
   const limit = Number(url.searchParams.get("limit") || 10);

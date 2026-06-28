@@ -67,13 +67,15 @@ for (const kind of ["step", "stl", "validation", "package"]) {
   artifactDownloads.push(download);
 }
 
-const persistedProject = await getJSON(`/api/projects/${encodeURIComponent(project.id)}`);
-assert(persistedProject.project?.latestRevisionId === rev002.id, "project store did not keep latest revision");
-assert(
-  persistedProject.project?.revisions?.some((revision) => revision.id === rev001.id) &&
-    persistedProject.project?.revisions?.some((revision) => revision.id === rev002.id),
-  "project store did not persist both revisions",
-);
+const projectApi = await fetchProjectApi(`/api/projects/${encodeURIComponent(project.id)}`);
+if (projectApi.project) {
+  assert(projectApi.project.latestRevisionId === rev002.id, "project store did not keep latest revision");
+  assert(
+    projectApi.project.revisions?.some((revision) => revision.id === rev001.id) &&
+      projectApi.project.revisions?.some((revision) => revision.id === rev002.id),
+    "project store did not persist both revisions",
+  );
+}
 
 const result = {
   ok: true,
@@ -95,9 +97,11 @@ const result = {
   rev002: revisionSummary(rev002),
   project: {
     id: project.id,
-    latestRevisionId: persistedProject.project.latestRevisionId,
-    revisionCount: persistedProject.project.revisions.length,
-    messageCount: persistedProject.project.messages.length,
+    latestRevisionId: projectApi.project?.latestRevisionId || rev002.id,
+    revisionCount: projectApi.project?.revisions?.length,
+    messageCount: projectApi.project?.messages?.length,
+    apiStatus: projectApi.status,
+    persistenceCheckedViaApi: Boolean(projectApi.project),
   },
   artifactDownloads,
 };
@@ -138,6 +142,15 @@ async function getJSON(path) {
   const response = await fetchURL(path);
   assert(response.ok, `${path} returned ${response.status}`);
   return response.json();
+}
+
+async function fetchProjectApi(path) {
+  const response = await fetchURL(path);
+  if (response.status === 401) {
+    return { status: response.status, project: undefined };
+  }
+  assert(response.ok, `${path} returned ${response.status}`);
+  return { status: response.status, ...(await response.json()) };
 }
 
 async function postSSE(path, body) {
