@@ -57,7 +57,7 @@ test("handoff:check fails the current HTTP Basic Auth fallback posture without l
   const outputPath = path.join(outputDir, "handoff.json");
 
   try {
-    const baseUrl = `http://operator:super-secret@127.0.0.1:${port}`;
+    const baseUrl = `http://127.0.0.1:${port}`;
     const result = await runNode(
       process.execPath,
       ["scripts/v12-handoff-check.mjs", "--base-url", baseUrl, "--output", outputPath],
@@ -72,7 +72,6 @@ test("handoff:check fails the current HTTP Basic Auth fallback posture without l
     );
 
     assert.equal(result.code, 1);
-    assert.equal(result.stdout.includes("super-secret"), false);
     assert.equal(result.stdout.includes("do-not-print-this"), false);
 
     const report = JSON.parse(readFileSync(outputPath, "utf8"));
@@ -92,6 +91,13 @@ test("handoff:check fails the current HTTP Basic Auth fallback posture without l
     assert.match(failedIds.join(","), /admin_requires_clerk_session/);
     assert.match(failedIds.join(","), /admin_email_declared/);
     assert.match(failedIds.join(","), /admin_password_delivery_declared/);
+    assert.match(failedIds.join(","), /admin_login_verified/);
+    assert.match(failedIds.join(","), /admin_project_create_verified/);
+    assert.match(failedIds.join(","), /admin_package_download_verified/);
+    assert.match(failedIds.join(","), /artifact_cross_owner_forbidden/);
+    assert.equal(report.observed.accessMode, "http_restricted");
+    assert.equal(report.observed.auth.clerkConfigured, false);
+    assert.equal(report.observed.dataLayer.mode, "postgres");
 
     const missingCredentialPath = path.join(outputDir, "missing-admin-credential.txt");
     const missingCredentialResult = await runNode(

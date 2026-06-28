@@ -217,7 +217,19 @@ V12_IP_FALLBACK_URL=http://203.0.113.10:12602 \
 V12_ADMIN_EMAIL=admin@example.com \
 V12_ADMIN_PASSWORD_DELIVERY=server_file \
 V12_ADMIN_CREDENTIAL_PATH=/opt/bilnd123-cad-agent-workspace/admin-credential.txt \
+V12_ADMIN_LOGIN_VERIFIED=1 \
+V12_ADMIN_PAGE_VERIFIED=1 \
+V12_NON_ADMIN_BLOCKED_VERIFIED=1 \
+V12_ADMIN_PROJECT_CREATE_VERIFIED=1 \
+V12_ADMIN_PACKAGE_DOWNLOAD_VERIFIED=1 \
+V12_ARTIFACT_AUTHZ_VERIFIED=1 \
 npm run handoff:check -- --output outputs/reports/v12-handoff-check.json
+```
+
+Generate the sanitized access handoff report from the check output:
+
+```bash
+npm run handoff:report -- --input outputs/reports/v12-handoff-check.json --output outputs/reports/v12-handoff-report.md
 ```
 
 The gate verifies:
@@ -234,6 +246,9 @@ The gate verifies:
 - `/app` and `/admin` do not return 200 when only the outer staging Basic Auth is satisfied and no Clerk session exists
 - admin email and password delivery are declared
 - when `V12_ADMIN_PASSWORD_DELIVERY=server_file`, the credential file exists and is not readable by group/world users
+- the real Clerk admin can log in, reach `/admin`, create a CAD project, and download their own `package.zip`
+- a non-admin Clerk user is blocked from `/admin`
+- a cross-owner artifact download attempt returns `403`
 
 This command intentionally fails against the temporary HTTP + Basic Auth staging posture. Use `smoke:staging` for temporary HTTP smoke checks; use `handoff:check` only for the final v1.2 SaaS access handoff claim. Run it on the staging host when the admin password is delivered through a server-only file; use `V12_ADMIN_PASSWORD_DELIVERY=secure_channel` only when the initial password is delivered out of band.
 

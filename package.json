@@ -10,6 +10,7 @@
     "db:migrate": "node scripts/migrate-postgres.mjs",
     "failures:export": "node scripts/export-failures.mjs",
     "handoff:check": "node scripts/v12-handoff-check.mjs",
+    "handoff:report": "node scripts/v12-handoff-report.mjs",
     "start": "next start",
     "lint": "eslint .",
     "release:check": "node scripts/release-check.mjs",

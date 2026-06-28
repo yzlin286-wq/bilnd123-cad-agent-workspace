@@ -31,6 +31,12 @@ export function evaluateV12Handoff({
   credentialPath,
   passwordDelivery,
   credentialInspection,
+  adminLoginVerified,
+  adminPageVerified,
+  nonAdminBlockedVerified,
+  adminProjectCreateVerified,
+  adminPackageDownloadVerified,
+  artifactAuthzVerified,
 } = {}) {
   const checks = [];
   const normalizedBaseUrl = safeUrl(baseUrl);
@@ -115,6 +121,27 @@ export function evaluateV12Handoff({
   if (normalizedDelivery === "secure_channel") {
     add(checks, "admin_password_secure_channel_declared", true, "A secure one-time password channel was declared.");
   }
+  add(checks, "admin_login_verified", adminLoginVerified === true, "A real Clerk admin login must be verified.");
+  add(checks, "admin_page_verified", adminPageVerified === true, "The logged-in admin must be verified to access /admin.");
+  add(checks, "non_admin_admin_blocked", nonAdminBlockedVerified === true, "A non-admin Clerk user must be blocked from /admin.");
+  add(
+    checks,
+    "admin_project_create_verified",
+    adminProjectCreateVerified === true,
+    "The admin must be verified to create a CAD project.",
+  );
+  add(
+    checks,
+    "admin_package_download_verified",
+    adminPackageDownloadVerified === true,
+    "The admin must be verified to download their own package.zip.",
+  );
+  add(
+    checks,
+    "artifact_cross_owner_forbidden",
+    artifactAuthzVerified === true,
+    "Cross-owner artifact download must be verified to return 403.",
+  );
 
   const failed = checks.filter((check) => !check.ok);
   return {
@@ -123,6 +150,47 @@ export function evaluateV12Handoff({
     baseUrl: normalizedBaseUrl,
     expectedIp: expectedIp || "",
     ipFallbackUrl: normalizedIpFallbackUrl,
+    observed: {
+      domainUrl: isHttpsUrl(baseUrl) && isDomainUrl(baseUrl) ? normalizedBaseUrl : "",
+      ipAddress: expectedIp || "",
+      ipFallbackUrl: normalizedIpFallbackUrl,
+      accessMode: stringValue(healthRecord.accessMode),
+      httpsConfigured: healthRecord.httpsConfigured === true,
+      warning: stringValue(healthRecord.warning),
+      health: {
+        app: stringValue(healthRecord.app),
+        cadRunnerConfigured: healthRecord.cadRunnerConfigured === true,
+        llmConfigured: healthRecord.llmConfigured === true,
+        outputDirWritable: healthRecord.outputDirWritable === true,
+        supportedTemplates: arrayOfStrings(healthRecord.supportedTemplates),
+      },
+      auth: {
+        clerkConfigured: auth.clerkConfigured === true,
+        basicAuthConfigured: auth.basicAuthConfigured === true,
+        devBypassEnabled: auth.devBypassEnabled === true,
+        adminAllowlistConfigured: auth.adminAllowlistConfigured === true,
+      },
+      dataLayer: {
+        mode: stringValue(dataLayer.mode),
+        productionReady: dataLayer.productionReady === true,
+        connected: dataLayer.connected === true,
+        projectStore: stringValue(dataLayer.projectStore),
+        schemaReady: dataLayer.schemaReady === true,
+      },
+      admin: {
+        email: stringValue(adminEmail),
+        passwordDelivery: normalizedDelivery,
+        credentialPath: normalizedDelivery === "server_file" ? stringValue(credentialPath) : "",
+      },
+      verification: {
+        adminLoginVerified: adminLoginVerified === true,
+        adminPageVerified: adminPageVerified === true,
+        nonAdminBlockedVerified: nonAdminBlockedVerified === true,
+        adminProjectCreateVerified: adminProjectCreateVerified === true,
+        adminPackageDownloadVerified: adminPackageDownloadVerified === true,
+        artifactAuthzVerified: artifactAuthzVerified === true,
+      },
+    },
     summary: {
       total: checks.length,
       passed: checks.length - failed.length,
@@ -175,6 +243,12 @@ async function main() {
     adminEmail,
     credentialPath,
     passwordDelivery,
+    adminLoginVerified: options.adminLoginVerified || envFlag("V12_ADMIN_LOGIN_VERIFIED"),
+    adminPageVerified: options.adminPageVerified || envFlag("V12_ADMIN_PAGE_VERIFIED"),
+    nonAdminBlockedVerified: options.nonAdminBlockedVerified || envFlag("V12_NON_ADMIN_BLOCKED_VERIFIED"),
+    adminProjectCreateVerified: options.adminProjectCreateVerified || envFlag("V12_ADMIN_PROJECT_CREATE_VERIFIED"),
+    adminPackageDownloadVerified: options.adminPackageDownloadVerified || envFlag("V12_ADMIN_PACKAGE_DOWNLOAD_VERIFIED"),
+    artifactAuthzVerified: options.artifactAuthzVerified || envFlag("V12_ARTIFACT_AUTHZ_VERIFIED"),
     dnsResolution,
     httpRedirect,
     ...ipFallbackProbe,
@@ -291,6 +365,12 @@ function parseArgs(args) {
     else if (arg === "--admin-email") options.adminEmail = args[++index];
     else if (arg === "--credential-path") options.credentialPath = args[++index];
     else if (arg === "--password-delivery") options.passwordDelivery = args[++index];
+    else if (arg === "--admin-login-verified") options.adminLoginVerified = true;
+    else if (arg === "--admin-page-verified") options.adminPageVerified = true;
+    else if (arg === "--non-admin-blocked-verified") options.nonAdminBlockedVerified = true;
+    else if (arg === "--admin-project-create-verified") options.adminProjectCreateVerified = true;
+    else if (arg === "--admin-package-download-verified") options.adminPackageDownloadVerified = true;
+    else if (arg === "--artifact-authz-verified") options.artifactAuthzVerified = true;
   }
   return options;
 }
@@ -354,6 +434,19 @@ function isHttpsRedirect(redirect, baseUrl) {
 
 function record(value) {
   return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+}
+
+function arrayOfStrings(value) {
+  return Array.isArray(value) ? value.filter((item) => typeof item === "string") : [];
+}
+
+function stringValue(value) {
+  return typeof value === "string" ? value : "";
+}
+
+function envFlag(name) {
+  const value = process.env[name]?.trim().toLowerCase();
+  return value === "1" || value === "true" || value === "yes";
 }
 
 function normalizePasswordDelivery(value, credentialPath) {
