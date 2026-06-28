@@ -1,5 +1,5 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
-import type { NextRequest } from "next/server";
+import type { NextFetchEvent, NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 
 const isSaaSProtectedRoute = createRouteMatcher(["/app(.*)", "/admin(.*)"]);
@@ -22,7 +22,12 @@ const fallbackProxy = (request: NextRequest) => {
   return NextResponse.next();
 };
 
-const handler = isClerkConfiguredForProxy() ? clerkProxy : fallbackProxy;
+const handler = (request: NextRequest, event: NextFetchEvent) => {
+  if (proxyMode() === "clerk") {
+    return clerkProxy(request, event);
+  }
+  return fallbackProxy(request);
+};
 
 export default handler;
 export const proxy = handler;
@@ -50,8 +55,12 @@ function stagingBasicAuthState(request: NextRequest) {
   };
 }
 
-function isClerkConfiguredForProxy() {
-  return Boolean(process.env.CLERK_SECRET_KEY?.trim() && process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY?.trim());
+export function proxyMode(env: Record<string, string | undefined> = process.env): "clerk" | "fallback" {
+  return isClerkConfiguredForProxy(env) ? "clerk" : "fallback";
+}
+
+function isClerkConfiguredForProxy(env: Record<string, string | undefined> = process.env) {
+  return Boolean(env.CLERK_SECRET_KEY?.trim() && env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY?.trim());
 }
 
 function isAuthorized(header: string | null, user: string, password: string) {
