@@ -3,7 +3,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import test from "node:test";
 import { CAD_OUTPUT_ROOT, artifactIdFromPath } from "../lib/cad/artifacts";
-import { adminRouteAccess, canAccessProject, getRequestAuthContext } from "../lib/server/auth";
+import { adminRouteAccess, appRouteAccess, canAccessProject, getRequestAuthContext } from "../lib/server/auth";
 import { GET as getArtifact } from "../app/api/artifacts/[id]/route";
 
 const PROJECT_STORE_PATH = path.resolve(process.cwd(), "logs", "projects.json");
@@ -26,6 +26,12 @@ test("admin route access allows only authenticated admins", () => {
     "allow",
   );
   assert.equal(adminRouteAccess({ isAuthenticated: true, email: "admin@example.com", isAdmin: false }), "forbidden");
+});
+
+test("app route access requires an authenticated SaaS user", () => {
+  assert.equal(appRouteAccess({ isAuthenticated: false, isAdmin: false }), "sign_in");
+  assert.equal(appRouteAccess({ isAuthenticated: true, userId: "member", isAdmin: false }), "allow");
+  assert.equal(appRouteAccess({ isAuthenticated: true, userId: "admin", isAdmin: true }), "allow");
 });
 
 test("artifact download requires auth and project ownership", async () => {

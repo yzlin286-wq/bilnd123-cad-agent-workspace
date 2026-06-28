@@ -73,6 +73,10 @@ export function adminRouteAccess(auth: AuthContext): "allow" | "sign_in" | "forb
   return isAdminUser(auth) ? "allow" : "forbidden";
 }
 
+export function appRouteAccess(auth: AuthContext): "allow" | "sign_in" {
+  return auth.isAuthenticated ? "allow" : "sign_in";
+}
+
 export function redirectToSignIn(pathname = "/app") {
   const url = new URL("/sign-in", "http://localhost");
   url.searchParams.set("redirect_url", pathname);
