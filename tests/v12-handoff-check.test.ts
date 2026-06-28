@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
+import { spawn } from "node:child_process";
 import { createServer } from "node:http";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import type { AddressInfo } from "node:net";
@@ -47,7 +47,7 @@ test("handoff:check fails the current HTTP Basic Auth fallback posture without l
 
   try {
     const baseUrl = `http://operator:super-secret@127.0.0.1:${port}`;
-    const result = spawnSync(
+    const result = await runNode(
       process.execPath,
       ["scripts/v12-handoff-check.mjs", "--base-url", baseUrl, "--output", outputPath],
       {
@@ -57,11 +57,10 @@ test("handoff:check fails the current HTTP Basic Auth fallback posture without l
           STAGING_BASIC_AUTH_USER: "cad-admin",
           STAGING_BASIC_AUTH_PASSWORD: "do-not-print-this",
         },
-        encoding: "utf8",
       },
     );
 
-    assert.equal(result.status, 1);
+    assert.equal(result.code, 1);
     assert.equal(result.stdout.includes("super-secret"), false);
     assert.equal(result.stdout.includes("do-not-print-this"), false);
 
@@ -75,8 +74,63 @@ test("handoff:check fails the current HTTP Basic Auth fallback posture without l
     assert.match(failedIds.join(","), /clerk_sign_in_rendered/);
     assert.match(failedIds.join(","), /app_requires_clerk_session/);
     assert.match(failedIds.join(","), /admin_requires_clerk_session/);
+    assert.match(failedIds.join(","), /admin_email_declared/);
+    assert.match(failedIds.join(","), /admin_password_delivery_declared/);
+
+    const missingCredentialPath = path.join(outputDir, "missing-admin-credential.txt");
+    const missingCredentialResult = await runNode(
+      process.execPath,
+      [
+        "scripts/v12-handoff-check.mjs",
+        "--base-url",
+        `http://127.0.0.1:${port}`,
+        "--admin-email",
+        "admin@example.com",
+        "--credential-path",
+        missingCredentialPath,
+        "--output",
+        outputPath,
+      ],
+      { cwd: process.cwd() },
+    );
+    assert.equal(missingCredentialResult.code, 1);
+    const credentialReport = JSON.parse(readFileSync(outputPath, "utf8"));
+    const credentialFailedIds = credentialReport.checks
+      .filter((check: { ok: boolean }) => !check.ok)
+      .map((check: { id: string }) => check.id);
+    assert.match(credentialFailedIds.join(","), /admin_credential_file_exists/);
+    assert.match(credentialFailedIds.join(","), /admin_credential_file_private/);
   } finally {
-    await new Promise<void>((resolve) => server.close(() => resolve()));
+    await new Promise<void>((resolve) => {
+      server.close(() => resolve());
+      server.closeAllConnections();
+    });
     rmSync(outputDir, { recursive: true, force: true });
   }
 });
+
+function runNode(command: string, args: string[], options: { cwd: string; env?: NodeJS.ProcessEnv }) {
+  return new Promise<{ code: number | null; stdout: string; stderr: string }>((resolve, reject) => {
+    const child = spawn(command, args, { ...options, stdio: ["ignore", "pipe", "pipe"] });
+    let stdout = "";
+    let stderr = "";
+    const timeout = setTimeout(() => {
+      child.kill("SIGKILL");
+      reject(new Error(`Command timed out: ${command} ${args.join(" ")}`));
+    }, 10_000);
+    child.stdout.on("data", (chunk) => {
+      stdout += chunk;
+    });
+    child.stderr.on("data", (chunk) => {
+      stderr += chunk;
+    });
+    child.on("error", (error) => {
+      clearTimeout(timeout);
+      reject(error);
+    });
+    child.on("close", (code) => {
+      clearTimeout(timeout);
+      resolve({ code, stdout, stderr });
+    });
+  });
+}

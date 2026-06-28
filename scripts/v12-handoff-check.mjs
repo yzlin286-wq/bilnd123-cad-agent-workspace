@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { existsSync } from "node:fs";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -19,11 +19,15 @@ export function evaluateV12Handoff({
   adminLocation,
   adminEmail,
   credentialPath,
+  passwordDelivery,
+  credentialInspection,
 } = {}) {
   const checks = [];
   const normalizedBaseUrl = safeUrl(baseUrl);
   const healthRecord = record(health);
   const dataLayer = record(healthRecord.dataLayer);
+  const normalizedDelivery = normalizePasswordDelivery(passwordDelivery, credentialPath);
+  const credentialRecord = record(credentialInspection);
 
   add(checks, "base_url_present", Boolean(baseUrl), "A staging base URL is required.");
   add(checks, "base_url_https", isHttpsUrl(baseUrl), "The v1.2 handoff URL must use HTTPS.");
@@ -61,12 +65,19 @@ export function evaluateV12Handoff({
     "With the outer staging gate satisfied but no Clerk session, /admin must redirect/block instead of returning 200.",
   );
   add(checks, "admin_email_declared", Boolean(adminEmail), "A Clerk admin email must be declared for handoff.");
-  add(
-    checks,
-    "admin_password_delivery_declared",
-    Boolean(credentialPath),
-    "A one-time admin password delivery path or secure channel must be declared.",
-  );
+  add(checks, "admin_password_delivery_declared", Boolean(normalizedDelivery), "A one-time admin password delivery method must be declared.");
+  if (normalizedDelivery === "server_file") {
+    add(checks, "admin_credential_file_exists", credentialRecord.exists === true, "The server-only admin credential file must exist.");
+    add(
+      checks,
+      "admin_credential_file_private",
+      credentialRecord.privatePermissions === true,
+      "The server-only admin credential file must not allow group or world access.",
+    );
+  }
+  if (normalizedDelivery === "secure_channel") {
+    add(checks, "admin_password_secure_channel_declared", true, "A secure one-time password channel was declared.");
+  }
 
   const failed = checks.filter((check) => !check.ok);
   return {
@@ -108,12 +119,17 @@ async function main() {
   const output = options.output || DEFAULT_OUTPUT;
   const adminEmail = options.adminEmail || process.env.ADMIN_BOOTSTRAP_EMAIL || process.env.V12_ADMIN_EMAIL;
   const credentialPath = options.credentialPath || process.env.ADMIN_BOOTSTRAP_CREDENTIAL_PATH || process.env.V12_ADMIN_CREDENTIAL_PATH;
+  const passwordDelivery =
+    options.passwordDelivery || process.env.ADMIN_BOOTSTRAP_PASSWORD_DELIVERY || process.env.V12_ADMIN_PASSWORD_DELIVERY;
   const authHeader = basicAuthHeader(process.env.STAGING_BASIC_AUTH_USER, process.env.STAGING_BASIC_AUTH_PASSWORD);
   const probe = baseUrl ? await probeStaging(baseUrl, authHeader) : {};
+  const credentialInspection = credentialPath ? await inspectCredentialFile(credentialPath) : undefined;
   const result = evaluateV12Handoff({
     baseUrl,
     adminEmail,
     credentialPath,
+    passwordDelivery,
+    credentialInspection,
     ...probe,
   });
 
@@ -180,8 +196,28 @@ function parseArgs(args) {
     else if (arg === "--output") options.output = args[++index];
     else if (arg === "--admin-email") options.adminEmail = args[++index];
     else if (arg === "--credential-path") options.credentialPath = args[++index];
+    else if (arg === "--password-delivery") options.passwordDelivery = args[++index];
   }
   return options;
+}
+
+async function inspectCredentialFile(filePath) {
+  try {
+    const fileStat = await stat(path.resolve(filePath));
+    const permissions = fileStat.mode & 0o777;
+    return {
+      checked: true,
+      exists: fileStat.isFile(),
+      privatePermissions: fileStat.isFile() && (permissions & 0o077) === 0,
+      mode: `0${permissions.toString(8).padStart(3, "0")}`,
+    };
+  } catch {
+    return {
+      checked: true,
+      exists: false,
+      privatePermissions: false,
+    };
+  }
 }
 
 async function writeJson(filePath, data) {
@@ -204,6 +240,13 @@ function isHttpsUrl(value) {
 
 function record(value) {
   return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+}
+
+function normalizePasswordDelivery(value, credentialPath) {
+  const normalized = typeof value === "string" ? value.trim() : "";
+  if (normalized === "secure_channel") return "secure_channel";
+  if (normalized === "server_file" || credentialPath) return "server_file";
+  return "";
 }
 
 const entryPath = process.argv[1] ? fileURLToPath(import.meta.url) : "";

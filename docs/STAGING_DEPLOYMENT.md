@@ -213,6 +213,7 @@ STAGING_BASE_URL=https://cad-agent.example.com \
 STAGING_BASIC_AUTH_USER=... \
 STAGING_BASIC_AUTH_PASSWORD=... \
 V12_ADMIN_EMAIL=admin@example.com \
+V12_ADMIN_PASSWORD_DELIVERY=server_file \
 V12_ADMIN_CREDENTIAL_PATH=/opt/bilnd123-cad-agent-workspace/admin-credential.txt \
 npm run handoff:check -- --output outputs/reports/v12-handoff-check.json
 ```
@@ -224,9 +225,10 @@ The gate verifies:
 - health reports `dataLayer.mode: "postgres"` and `productionReady: true`
 - `/sign-in` renders Clerk UI instead of the placeholder
 - `/app` and `/admin` do not return 200 when only the outer staging Basic Auth is satisfied and no Clerk session exists
-- admin email and password delivery path are declared
+- admin email and password delivery are declared
+- when `V12_ADMIN_PASSWORD_DELIVERY=server_file`, the credential file exists and is not readable by group/world users
 
-This command intentionally fails against the temporary HTTP + Basic Auth staging posture. Use `smoke:staging` for temporary HTTP smoke checks; use `handoff:check` only for the final v1.2 SaaS access handoff claim.
+This command intentionally fails against the temporary HTTP + Basic Auth staging posture. Use `smoke:staging` for temporary HTTP smoke checks; use `handoff:check` only for the final v1.2 SaaS access handoff claim. Run it on the staging host when the admin password is delivered through a server-only file; use `V12_ADMIN_PASSWORD_DELIVERY=secure_channel` only when the initial password is delivered out of band.
 
 ## Logs
 

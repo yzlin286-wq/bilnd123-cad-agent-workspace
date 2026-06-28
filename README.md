@@ -205,11 +205,12 @@ STAGING_BASE_URL=https://cad-agent.example.com \
 STAGING_BASIC_AUTH_USER=... \
 STAGING_BASIC_AUTH_PASSWORD=... \
 V12_ADMIN_EMAIL=admin@example.com \
+V12_ADMIN_PASSWORD_DELIVERY=server_file \
 V12_ADMIN_CREDENTIAL_PATH=/opt/bilnd123-cad-agent-workspace/admin-credential.txt \
 npm run handoff:check -- --output outputs/reports/v12-handoff-check.json
 ```
 
-This check intentionally fails for the temporary HTTP + Basic Auth staging posture. It must not be used to claim handoff completion until it passes against the real HTTPS/Clerk deployment.
+This check intentionally fails for the temporary HTTP + Basic Auth staging posture. It must not be used to claim handoff completion until it passes against the real HTTPS/Clerk deployment. When `V12_ADMIN_PASSWORD_DELIVERY=server_file`, run the check on the staging host so it can verify the credential file exists and is not readable by group/world users. Use `V12_ADMIN_PASSWORD_DELIVERY=secure_channel` only when the password was delivered out of band.
 
 Dev fallback persistence and feedback files live in the staging log volume only when `DATABASE_URL` is absent:
 
