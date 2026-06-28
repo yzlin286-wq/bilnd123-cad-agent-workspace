@@ -207,7 +207,7 @@ Observation tools:
 - `npm run admin:flow:verify`: verify sanitized evidence for admin login, `/admin`, project create, package download, and cross-owner artifact denial
 - `npm run handoff:current-access`: render the current temporary access report without printing passwords
 - `npm run handoff:domain:check`: verify DNS, HTTP to HTTPS redirect, HTTPS `/api/health`, and optional IP fallback
-- `npm run handoff:env:audit`: audit the server-only `.env` and admin credential file permissions without printing secrets
+- `npm run handoff:env:audit`: audit the server-only `.env` and safe admin credential-file evidence without printing secrets
 - `npm run handoff:preflight`: render the private v1.2 access handoff status in the requested Access/Admin format
 - `npm run handoff:check`: strict v1.2 SaaS access handoff gate for HTTPS, Clerk, Postgres, and admin credential delivery
 - `npm run handoff:report`: render a sanitized v1.2 handoff report from `outputs/reports/v12-handoff-check.json`

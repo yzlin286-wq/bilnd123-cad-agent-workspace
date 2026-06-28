@@ -17,6 +17,7 @@ export type V12EnvAuditReport = {
     appCommitSha: boolean;
     basicAuth: boolean;
     adminEmail: boolean;
+    adminIdentity: boolean;
     adminCredentialPath: boolean;
   };
   files: {
@@ -35,6 +36,9 @@ export type FileAuditInfo = {
   exists?: boolean;
   privatePermissions?: boolean;
   mode?: string;
+  identityMatches?: boolean;
+  passwordPresent?: boolean;
+  rotationRequired?: boolean;
 };
 
 export function parseEnvText(text: string): Record<string, string>;
@@ -47,3 +51,5 @@ export function evaluateV12EnvAudit(input?: {
 }): V12EnvAuditReport;
 
 export function renderV12EnvAudit(report: V12EnvAuditReport): string;
+
+export function inspectCredentialFile(filePath: string, expectedIdentity?: string): Promise<FileAuditInfo>;

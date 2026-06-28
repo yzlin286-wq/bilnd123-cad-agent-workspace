@@ -29,6 +29,7 @@ export function evaluateV12EnvAudit({ env = {}, envFile = ".env", envFileInfo, c
   const stagingDomain = stringValue(env.STAGING_DOMAIN);
   const credentialPath =
     stringValue(env.ADMIN_BOOTSTRAP_CREDENTIAL_PATH) || stringValue(env.V12_ADMIN_CREDENTIAL_PATH) || stringValue(env.ADMIN_CREDENTIAL_PATH);
+  const adminIdentity = stringValue(env.ADMIN_BOOTSTRAP_EMAIL) || stringValue(env.V12_ADMIN_EMAIL) || stringValue(env.STAGING_BASIC_AUTH_USER);
   const credentialInfo = record(credentialFileInfo);
 
   add(checks, "env_file_exists", envFileInfo?.exists === true, "Server-only .env must exist.");
@@ -65,6 +66,24 @@ export function evaluateV12EnvAudit({ env = {}, envFile = ".env", envFileInfo, c
       credentialInfo.privatePermissions === true,
       "Admin credential file must be chmod 600 or stricter.",
     );
+    add(
+      checks,
+      "admin_credential_identity_matches",
+      credentialInfo.identityMatches === true,
+      "Admin credential file must match the declared admin identity.",
+    );
+    add(
+      checks,
+      "admin_credential_password_present",
+      credentialInfo.passwordPresent === true,
+      "Admin credential file must contain an initial password.",
+    );
+    add(
+      checks,
+      "admin_credential_rotation_required",
+      credentialInfo.rotationRequired === true,
+      "Admin credential file must require password rotation.",
+    );
   }
 
   const failed = checks.filter((check) => !check.ok);
@@ -87,6 +106,7 @@ export function evaluateV12EnvAudit({ env = {}, envFile = ".env", envFileInfo, c
       appCommitSha: looksLikeCommit(env.APP_COMMIT_SHA),
       basicAuth: usableValue(env.STAGING_BASIC_AUTH_USER) && usableValue(env.STAGING_BASIC_AUTH_PASSWORD),
       adminEmail: usableValue(env.ADMIN_BOOTSTRAP_EMAIL) || usableValue(env.V12_ADMIN_EMAIL),
+      adminIdentity: usableValue(adminIdentity),
       adminCredentialPath: usableValue(credentialPath),
     },
     files: {
@@ -122,6 +142,7 @@ export function renderV12EnvAudit(report) {
     `- APP_COMMIT_SHA: ${yesNo(configured.appCommitSha)}`,
     `- Basic Auth gate: ${yesNo(configured.basicAuth)}`,
     `- Admin email: ${yesNo(configured.adminEmail)}`,
+    `- Admin identity: ${yesNo(configured.adminIdentity)}`,
     `- Admin credential path: ${yesNo(configured.adminCredentialPath)}`,
     "",
     "## Files",
@@ -130,6 +151,9 @@ export function renderV12EnvAudit(report) {
     `- Admin credential exists: ${yesNo(credentialFile.exists)}, private: ${yesNo(credentialFile.privatePermissions)}, mode: ${
       stringValue(credentialFile.mode) || "unknown"
     }`,
+    `- Admin credential identity matches: ${yesNo(credentialFile.identityMatches)}`,
+    `- Admin credential password present: ${yesNo(credentialFile.passwordPresent)}`,
+    `- Admin credential rotation required: ${yesNo(credentialFile.rotationRequired)}`,
     "",
     "## Blockers",
     "",
@@ -145,11 +169,12 @@ async function main() {
   const envText = await readTextIfPresent(envFile);
   const env = parseEnvText(envText);
   const credentialPath = options.credentialPath || env.ADMIN_BOOTSTRAP_CREDENTIAL_PATH || env.V12_ADMIN_CREDENTIAL_PATH || "";
+  const adminIdentity = env.ADMIN_BOOTSTRAP_EMAIL || env.V12_ADMIN_EMAIL || env.STAGING_BASIC_AUTH_USER || "";
   const report = evaluateV12EnvAudit({
     env,
     envFile,
     envFileInfo: await inspectFile(envFile),
-    credentialFileInfo: credentialPath ? await inspectFile(credentialPath) : undefined,
+    credentialFileInfo: credentialPath ? await inspectCredentialFile(credentialPath, adminIdentity) : undefined,
   });
   const output = options.output || DEFAULT_OUTPUT;
   await writeText(output, renderV12EnvAudit(report));
@@ -176,6 +201,48 @@ async function inspectFile(filePath) {
   }
 }
 
+export async function inspectCredentialFile(filePath, expectedIdentity) {
+  try {
+    const fileInfo = await inspectFile(filePath);
+    const text = fileInfo.exists ? await readFile(path.resolve(filePath), "utf8") : "";
+    const credential = parseCredentialFile(text);
+    const normalizedExpectedIdentity = normalizeIdentity(expectedIdentity);
+    return {
+      ...fileInfo,
+      identityMatches: Boolean(normalizedExpectedIdentity && credential.identity === normalizedExpectedIdentity),
+      passwordPresent: credential.passwordPresent === true,
+      rotationRequired: credential.rotationRequired === true,
+    };
+  } catch {
+    return {
+      checked: true,
+      exists: false,
+      privatePermissions: false,
+      mode: "",
+      identityMatches: false,
+      passwordPresent: false,
+      rotationRequired: false,
+    };
+  }
+}
+
+function parseCredentialFile(text) {
+  const parsed = { identity: "", passwordPresent: false, rotationRequired: false };
+  for (const line of String(text || "").split(/\r?\n/)) {
+    const equalsSeparator = line.indexOf("=");
+    const colonSeparator = line.indexOf(":");
+    const separator =
+      equalsSeparator >= 0 && (colonSeparator < 0 || equalsSeparator < colonSeparator) ? equalsSeparator : colonSeparator;
+    if (separator < 0) continue;
+    const key = line.slice(0, separator).trim().toLowerCase();
+    const value = line.slice(separator + 1).trim();
+    if (key === "email" || key === "user" || key === "username") parsed.identity = normalizeIdentity(value);
+    if (key === "password") parsed.passwordPresent = Boolean(value);
+    if (key === "rotation_required") parsed.rotationRequired = value.toLowerCase() === "yes";
+  }
+  return parsed;
+}
+
 async function readTextIfPresent(filePath) {
   try {
     return await readFile(path.resolve(filePath), "utf8");
@@ -197,6 +264,9 @@ function sanitizeFileInfo(value) {
     exists: info.exists === true,
     privatePermissions: info.privatePermissions === true,
     mode: stringValue(info.mode),
+    identityMatches: info.identityMatches === true,
+    passwordPresent: info.passwordPresent === true,
+    rotationRequired: info.rotationRequired === true,
   };
 }
 
@@ -272,6 +342,10 @@ function arrayValue(value) {
 
 function stringValue(value) {
   return typeof value === "string" ? value : "";
+}
+
+function normalizeIdentity(value) {
+  return stringValue(value).trim().toLowerCase();
 }
 
 function numberValue(value) {
