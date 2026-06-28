@@ -1,16 +1,18 @@
 import { getAdminSummary } from "@/lib/server/admin-summary";
-import { getPageAuthContext, isAdminUser } from "@/lib/server/auth";
+import { adminRouteAccess, getPageAuthContext } from "@/lib/server/auth";
+import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminPage() {
   const auth = await getPageAuthContext();
-  if (!auth.isAuthenticated) {
-    return <AccessPanel title="Sign in required" message="Use the configured SaaS sign-in flow before opening the admin dashboard." />;
+  const access = adminRouteAccess(auth);
+  if (access === "sign_in") {
+    redirect("/sign-in?redirect_url=/admin");
   }
-  if (!isAdminUser(auth)) {
-    return <AccessPanel title="Admin access required" message="This dashboard is limited to configured admin users or organization admins." />;
+  if (access === "forbidden") {
+    redirect("/app");
   }
   const summary = await getAdminSummary();
 
@@ -85,18 +87,6 @@ export default async function AdminPage() {
             <li>Production ready: {String(summary.dataLayer.productionReady)}</li>
           </ul>
         </AdminPanel>
-      </section>
-    </main>
-  );
-}
-
-function AccessPanel({ title, message }: { title: string; message: string }) {
-  return (
-    <main className="admin-shell">
-      <section className="access-panel">
-        <p className="microcopy">Protected admin</p>
-        <h1>{title}</h1>
-        <p>{message}</p>
       </section>
     </main>
   );

@@ -3,7 +3,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import test from "node:test";
 import { CAD_OUTPUT_ROOT, artifactIdFromPath } from "../lib/cad/artifacts";
-import { canAccessProject, getRequestAuthContext } from "../lib/server/auth";
+import { adminRouteAccess, canAccessProject, getRequestAuthContext } from "../lib/server/auth";
 import { GET as getArtifact } from "../app/api/artifacts/[id]/route";
 
 const PROJECT_STORE_PATH = path.resolve(process.cwd(), "logs", "projects.json");
@@ -15,6 +15,17 @@ test("project access allows owners, org members, and admins only", () => {
   assert.equal(canAccessProject({ isAuthenticated: true, userId: "user_b", organizationId: "org_a", isAdmin: false }, project), true);
   assert.equal(canAccessProject({ isAuthenticated: true, userId: "user_b", organizationId: "org_b", isAdmin: false }, project), false);
   assert.equal(canAccessProject({ isAuthenticated: true, userId: "admin", isAdmin: true }, project), true);
+});
+
+test("admin route access allows only authenticated admins", () => {
+  assert.equal(adminRouteAccess({ isAuthenticated: false, isAdmin: false }), "sign_in");
+  assert.equal(adminRouteAccess({ isAuthenticated: true, userId: "member", isAdmin: false }), "forbidden");
+  assert.equal(adminRouteAccess({ isAuthenticated: true, userId: "admin", isAdmin: true }), "allow");
+  assert.equal(
+    adminRouteAccess({ isAuthenticated: true, userId: "org-owner", organizationRole: "owner", isAdmin: false }),
+    "allow",
+  );
+  assert.equal(adminRouteAccess({ isAuthenticated: true, email: "admin@example.com", isAdmin: false }), "forbidden");
 });
 
 test("artifact download requires auth and project ownership", async () => {

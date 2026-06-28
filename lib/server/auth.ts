@@ -68,6 +68,11 @@ export function isAdminUser(auth: AuthContext) {
   return envList("SAAS_ADMIN_USER_IDS").includes(auth.userId || "") || envList("SAAS_ADMIN_EMAILS").includes(auth.email || "");
 }
 
+export function adminRouteAccess(auth: AuthContext): "allow" | "sign_in" | "forbidden" {
+  if (!auth.isAuthenticated) return "sign_in";
+  return isAdminUser(auth) ? "allow" : "forbidden";
+}
+
 export function redirectToSignIn(pathname = "/app") {
   const url = new URL("/sign-in", "http://localhost");
   url.searchParams.set("redirect_url", pathname);
