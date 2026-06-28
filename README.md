@@ -203,6 +203,7 @@ Observation tools:
 - `npm run failures:export`: write a sanitized failure corpus for triage
 - `npm run staging:report`: generate a local sanitized report at `outputs/reports/staging-report.md`
 - `npm run staging:protocol`: dry-run the 20-prompt internal trial protocol at `outputs/protocol/latest.json`
+- `npm run staging:rotate-basic-auth`: rotate the temporary staging Basic Auth gate and server-only credential file without printing the password
 - `npm run admin:verify`: verify the declared Clerk admin exists, has password login, and is authorized as admin
 - `npm run admin:flow:verify`: verify sanitized evidence for admin login, `/admin`, project create, package download, and cross-owner artifact denial
 - `npm run handoff:current-access`: render the current temporary access report without printing passwords
@@ -217,6 +218,8 @@ Observation tools:
 Run `npm run admin:bootstrap` inside the `cad-agent` container, or on a host where `npm ci` has already installed dependencies. The command talks to the real Clerk Backend API, writes the optional server-only credential file with `chmod 600`, persists only safe handoff metadata to `.env` when requested, and never prints the generated password.
 
 For an existing Clerk user, the bootstrap applies `ADMIN_BOOTSTRAP_PASSWORD` by default so the delivered one-time password actually works. Set `ADMIN_BOOTSTRAP_RESET_PASSWORD=0` only when you intentionally do not want to rotate an existing user's password.
+
+For the current temporary HTTP-restricted staging gate, use `npm run staging:rotate-basic-auth -- --password-stdin` to rotate `STAGING_BASIC_AUTH_PASSWORD` and `/opt/bilnd123-cad-agent-workspace/admin-credential.txt`. This is only the outer Basic Auth gate; it does not replace the real Clerk admin bootstrap required for final v1.2 handoff.
 
 Verify the real Clerk admin after bootstrap:
 

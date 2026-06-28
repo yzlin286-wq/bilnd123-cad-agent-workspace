@@ -23,6 +23,7 @@
     "runs:classify": "node scripts/classify-runs.mjs",
     "runs:summary": "node scripts/summarize-runs.mjs",
     "smoke:staging": "node scripts/staging-smoke.mjs",
+    "staging:rotate-basic-auth": "node scripts/rotate-basic-auth-credential.mjs",
     "staging:report": "node scripts/staging-report.mjs",
     "staging:protocol": "node scripts/run-staging-protocol.mjs",
     "test": "tsx --test tests/**/*.test.ts",

@@ -180,18 +180,32 @@ docker compose -f docker-compose.staging.yml --env-file .env up -d
 
 ### Rotate `STAGING_BASIC_AUTH_PASSWORD`
 
-1. Generate a replacement on the server:
+Use the rotation helper on the staging host. It updates the server-only `.env`, writes the server-only credential handoff file, and prints only safe metadata.
+
+1. Generate a replacement on a trusted shell:
 
 ```bash
-openssl rand -base64 32
+NEW_PASSWORD="$(openssl rand -base64 32)"
 ```
 
-2. Update `STAGING_BASIC_AUTH_PASSWORD` in `.env`.
-3. Keep `.env` locked down:
+2. Rotate the staging Basic Auth credential without putting the password in command arguments:
+
+```bash
+printf '%s' "$NEW_PASSWORD" | npm run staging:rotate-basic-auth -- \
+  --staging-env-file .env \
+  --credential-path /opt/bilnd123-cad-agent-workspace/admin-credential.txt \
+  --user cad-admin \
+  --access-mode http_restricted \
+  --password-stdin
+```
+
+3. Keep `.env` and the credential file locked down:
 
 ```bash
 chmod 600 .env
+chmod 600 /opt/bilnd123-cad-agent-workspace/admin-credential.txt
 stat -c '%a %U:%G %n' .env
+stat -c '%a %U:%G %n' /opt/bilnd123-cad-agent-workspace/admin-credential.txt
 ```
 
 4. Restart only this project:
@@ -200,12 +214,14 @@ stat -c '%a %U:%G %n' .env
 docker compose -f docker-compose.staging.yml --env-file .env up -d
 ```
 
-5. Verify unauthenticated and authenticated health:
+5. Verify unauthenticated and authenticated health. Use the deployment port actually mapped on the host:
 
 ```bash
 curl -i http://127.0.0.1:12601/api/health
 curl -u "$STAGING_BASIC_AUTH_USER:$STAGING_BASIC_AUTH_PASSWORD" http://127.0.0.1:12601/api/health
 ```
+
+6. Deliver the one-time password over the chosen secure channel, or leave it only in the server-only credential file and tell the operator the file path. Do not paste it into GitHub, docs, CI logs, run logs, or public artifacts.
 
 Never commit real keys, cookies, tokens, or private server passwords to the repository.
 
