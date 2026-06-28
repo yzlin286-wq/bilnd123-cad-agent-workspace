@@ -17,6 +17,7 @@ export async function GET() {
   const accessMode = parseStagingAccessMode();
   const warning = healthWarning({ nodeEnv: process.env.NODE_ENV, httpsConfigured });
   const dataLayer = await getDataLayerStatus();
+  const auth = authPosture();
 
   return Response.json({
     ok: outputDirWritable,
@@ -27,6 +28,7 @@ export async function GET() {
     httpsConfigured,
     accessMode,
     warning,
+    auth,
     dataLayer,
     supportedTemplates,
   });
@@ -57,6 +59,23 @@ export function healthWarning({
   return nodeEnv === "production" && !httpsConfigured
     ? "Staging is running without HTTPS domain; restrict access."
     : undefined;
+}
+
+export function authPosture({
+  clerkSecretKey = process.env.CLERK_SECRET_KEY,
+  clerkPublishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
+  stagingBasicAuthUser = process.env.STAGING_BASIC_AUTH_USER,
+  stagingBasicAuthPassword = process.env.STAGING_BASIC_AUTH_PASSWORD,
+  devBypass = process.env.SAAS_DEV_AUTH_BYPASS,
+  adminUserIds = process.env.SAAS_ADMIN_USER_IDS,
+  adminEmails = process.env.SAAS_ADMIN_EMAILS,
+} = {}) {
+  return {
+    clerkConfigured: Boolean(clerkSecretKey?.trim() && clerkPublishableKey?.trim()),
+    basicAuthConfigured: Boolean(stagingBasicAuthUser?.trim() && stagingBasicAuthPassword?.trim()),
+    devBypassEnabled: devBypass === "1",
+    adminAllowlistConfigured: Boolean(adminUserIds?.trim() || adminEmails?.trim()),
+  };
 }
 
 async function canWriteOutputDir() {

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { healthWarning, isHttpsConfigured, parseStagingAccessMode } from "../app/api/health/route";
+import { authPosture, healthWarning, isHttpsConfigured, parseStagingAccessMode } from "../app/api/health/route";
 import { getDataLayerStatus } from "../lib/server/data-layer";
 
 test("parseStagingAccessMode accepts only documented access modes", () => {
@@ -26,6 +26,31 @@ test("isHttpsConfigured requires a domain and an explicit HTTPS enable flag", ()
   assert.equal(isHttpsConfigured({ stagingDomain: "cad.example.com", stagingHttpsEnabled: "0" }), false);
   assert.equal(isHttpsConfigured({ stagingDomain: "cad.example.com", stagingHttpsEnabled: undefined }), false);
   assert.equal(isHttpsConfigured({ stagingDomain: "", stagingHttpsEnabled: "1" }), false);
+});
+
+test("authPosture reports safe booleans without exposing secret values", () => {
+  assert.deepEqual(
+    authPosture({
+      clerkSecretKey: "sk_test_secret",
+      clerkPublishableKey: "pk_test_public",
+      stagingBasicAuthUser: "cad-admin",
+      stagingBasicAuthPassword: "basic-secret",
+      devBypass: "0",
+      adminEmails: "admin@example.com",
+    }),
+    {
+      clerkConfigured: true,
+      basicAuthConfigured: true,
+      devBypassEnabled: false,
+      adminAllowlistConfigured: true,
+    },
+  );
+  assert.deepEqual(authPosture({ devBypass: "1" }), {
+    clerkConfigured: false,
+    basicAuthConfigured: false,
+    devBypassEnabled: true,
+    adminAllowlistConfigured: false,
+  });
 });
 
 test("data layer reports JSON fallback when DATABASE_URL is absent", async () => {

@@ -107,6 +107,10 @@ For a v1.2 SaaS access handoff, authenticated health must include:
   "cadRunnerConfigured": true,
   "llmConfigured": true,
   "outputDirWritable": true,
+  "auth": {
+    "clerkConfigured": true,
+    "devBypassEnabled": false
+  },
   "dataLayer": {
     "mode": "postgres",
     "productionReady": true

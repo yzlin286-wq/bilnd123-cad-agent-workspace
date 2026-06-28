@@ -222,6 +222,7 @@ The gate verifies:
 
 - the public URL uses HTTPS
 - authenticated `/api/health` reports `httpsConfigured: true`, `accessMode: "https"`, no warning, runner true, llm true, output writable true
+- health reports `auth.clerkConfigured: true` and `auth.devBypassEnabled: false`
 - health reports `dataLayer.mode: "postgres"` and `productionReady: true`
 - `/sign-in` renders Clerk UI instead of the placeholder
 - `/app` and `/admin` do not return 200 when only the outer staging Basic Auth is satisfied and no Clerk session exists

@@ -26,6 +26,7 @@ export function evaluateV12Handoff({
   const normalizedBaseUrl = safeUrl(baseUrl);
   const healthRecord = record(health);
   const dataLayer = record(healthRecord.dataLayer);
+  const auth = record(healthRecord.auth);
   const normalizedDelivery = normalizePasswordDelivery(passwordDelivery, credentialPath);
   const credentialRecord = record(credentialInspection);
 
@@ -39,6 +40,8 @@ export function evaluateV12Handoff({
   add(checks, "health_https_configured", healthRecord.httpsConfigured === true, "Health must report httpsConfigured=true.");
   add(checks, "health_access_mode_https", healthRecord.accessMode === "https", "Health must report accessMode=https.");
   add(checks, "health_no_warning", !healthRecord.warning, "Health must not return an HTTP exposure warning.");
+  add(checks, "health_clerk_configured", auth.clerkConfigured === true, "Health must report Clerk configured.");
+  add(checks, "health_dev_bypass_disabled", auth.devBypassEnabled === false, "SAAS_DEV_AUTH_BYPASS must be disabled in staging.");
   add(checks, "health_data_layer_postgres", dataLayer.mode === "postgres", "Staging must use Postgres.");
   add(
     checks,

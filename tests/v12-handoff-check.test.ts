@@ -20,6 +20,12 @@ test("handoff:check fails the current HTTP Basic Auth fallback posture without l
           httpsConfigured: false,
           accessMode: "http_restricted",
           warning: "Staging is running without HTTPS domain; restrict access.",
+          auth: {
+            clerkConfigured: false,
+            basicAuthConfigured: true,
+            devBypassEnabled: false,
+            adminAllowlistConfigured: false,
+          },
           dataLayer: { mode: "postgres", productionReady: true },
         }),
       );
@@ -71,6 +77,7 @@ test("handoff:check fails the current HTTP Basic Auth fallback posture without l
     assert.match(failedIds.join(","), /base_url_https/);
     assert.match(failedIds.join(","), /health_https_configured/);
     assert.match(failedIds.join(","), /health_access_mode_https/);
+    assert.match(failedIds.join(","), /health_clerk_configured/);
     assert.match(failedIds.join(","), /clerk_sign_in_rendered/);
     assert.match(failedIds.join(","), /app_requires_clerk_session/);
     assert.match(failedIds.join(","), /admin_requires_clerk_session/);

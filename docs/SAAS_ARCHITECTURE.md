@@ -65,6 +65,7 @@ The v1.2 handoff is only complete when all of these are true:
 - Caddy or an equivalent reverse proxy terminates HTTPS and redirects HTTP to HTTPS.
 - `/api/health` returns `httpsConfigured: true`, `accessMode: "https"`, and no HTTP warning.
 - Real Clerk keys are configured.
+- `/api/health` returns `auth.clerkConfigured: true` and `auth.devBypassEnabled: false`.
 - An admin Clerk user has been bootstrapped and verified.
 - `dataLayer.mode` is `postgres` and `productionReady` is `true`.
 - `npm run handoff:check` passes against the HTTPS staging URL.
