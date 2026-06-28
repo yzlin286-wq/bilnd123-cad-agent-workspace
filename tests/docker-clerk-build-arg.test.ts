@@ -17,3 +17,17 @@ test("Docker build receives Clerk publishable key for Next client bundles", () =
   assert.match(httpsCompose, /STAGING_ACCESS_MODE:\s*\$\{STAGING_ACCESS_MODE:-https\}/);
   assert.match(httpsCompose, /STAGING_HTTPS_ENABLED:\s*\$\{STAGING_HTTPS_ENABLED:-1\}/);
 });
+
+test("HTTP and HTTPS staging compose share the same project and persistence volumes", () => {
+  const stagingCompose = readFileSync("docker-compose.staging.yml", "utf8");
+  const httpsCompose = readFileSync("docker-compose.staging.https.yml", "utf8");
+
+  assert.match(stagingCompose, /^name:\s*bilnd123-cad-agent-workspace/m);
+  assert.match(httpsCompose, /^name:\s*bilnd123-cad-agent-workspace/m);
+  for (const volume of ["cad_outputs", "run_logs", "postgres_data"]) {
+    assert.match(stagingCompose, new RegExp(`^  ${volume}:\\s*$`, "m"));
+    assert.match(httpsCompose, new RegExp(`^  ${volume}:\\s*$`, "m"));
+  }
+  assert.doesNotMatch(httpsCompose, /name:\s*bilnd123_cad_outputs/);
+  assert.doesNotMatch(httpsCompose, /name:\s*bilnd123_run_logs/);
+});

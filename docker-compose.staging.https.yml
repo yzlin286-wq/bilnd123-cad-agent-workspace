@@ -1,4 +1,4 @@
-name: bilnd123-staging-https
+name: bilnd123-cad-agent-workspace
 
 services:
   postgres:
@@ -91,9 +91,7 @@ services:
 
 volumes:
   cad_outputs:
-    name: bilnd123_cad_outputs
   run_logs:
-    name: bilnd123_run_logs
   caddy_data:
   caddy_config:
   postgres_data:

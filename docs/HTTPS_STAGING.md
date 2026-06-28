@@ -60,8 +60,10 @@ It uses:
 - `deploy/Caddyfile.staging`
 - `cad-agent:3000` as the upstream
 - host ports `80` and `443`
-- existing `bilnd123_cad_outputs` and `bilnd123_run_logs` volumes for app state
+- existing `bilnd123-cad-agent-workspace_cad_outputs`, `bilnd123-cad-agent-workspace_run_logs`, and `bilnd123-cad-agent-workspace_postgres_data` volumes for app state
 - persistent `caddy_data` and `caddy_config` volumes for certificate state
+
+Both staging compose files use the same Compose project name, `bilnd123-cad-agent-workspace`, so switching from HTTP staging to HTTPS staging reuses the existing CAD outputs, run logs, and Postgres metadata instead of starting with empty volumes.
 
 The Caddyfile redirects HTTP to HTTPS:
 
