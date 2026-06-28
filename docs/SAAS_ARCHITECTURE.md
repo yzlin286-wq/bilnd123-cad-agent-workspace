@@ -67,6 +67,7 @@ The v1.2 handoff is only complete when all of these are true:
 - Real Clerk keys are configured.
 - An admin Clerk user has been bootstrapped and verified.
 - `dataLayer.mode` is `postgres` and `productionReady` is `true`.
+- `npm run handoff:check` passes against the HTTPS staging URL.
 
 ## Runtime Boundaries
 

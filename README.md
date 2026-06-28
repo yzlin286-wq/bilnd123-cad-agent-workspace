@@ -141,6 +141,7 @@ npm run runs:summary
 npm run failures:export
 npm run staging:report
 npm run staging:protocol
+npm run handoff:check
 npm run release:check
 ```
 
@@ -193,8 +194,22 @@ Observation tools:
 - `npm run failures:export`: write a sanitized failure corpus for triage
 - `npm run staging:report`: generate a local sanitized report at `outputs/reports/staging-report.md`
 - `npm run staging:protocol`: dry-run the 20-prompt internal trial protocol at `outputs/protocol/latest.json`
+- `npm run handoff:check`: strict v1.2 SaaS access handoff gate for HTTPS, Clerk, Postgres, and admin credential delivery
 
 `npm run staging:protocol -- --execute --output outputs/protocol/latest.json` calls the real staging service and can incur model/API cost. Use it only when the staging access path and authentication are configured. The v1.2 handoff target expects `STAGING_ACCESS_MODE=https`, `STAGING_DOMAIN=<real-domain>`, and `STAGING_HTTPS_ENABLED=1` once a real domain and certificate are active; until then, `http_restricted` must stay firewall-restricted.
+
+Run the v1.2 handoff gate only when a real HTTPS domain and Clerk keys are configured:
+
+```bash
+STAGING_BASE_URL=https://cad-agent.example.com \
+STAGING_BASIC_AUTH_USER=... \
+STAGING_BASIC_AUTH_PASSWORD=... \
+V12_ADMIN_EMAIL=admin@example.com \
+V12_ADMIN_CREDENTIAL_PATH=/opt/bilnd123-cad-agent-workspace/admin-credential.txt \
+npm run handoff:check -- --output outputs/reports/v12-handoff-check.json
+```
+
+This check intentionally fails for the temporary HTTP + Basic Auth staging posture. It must not be used to claim handoff completion until it passes against the real HTTPS/Clerk deployment.
 
 Dev fallback persistence and feedback files live in the staging log volume only when `DATABASE_URL` is absent:
 

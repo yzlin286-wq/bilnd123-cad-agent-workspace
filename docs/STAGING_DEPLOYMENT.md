@@ -204,6 +204,30 @@ npm run smoke:staging -- --output outputs/smoke/latest.json
 
 The smoke script checks `/api/health`, creates a `mounting_plate`, revises thickness to `6 mm`, verifies unchanged dimensions, downloads generated artifacts including `package.zip`, and verifies the ZIP file contains the expected CAD files.
 
+## v1.2 Handoff Gate
+
+After the real HTTPS domain, Clerk keys, Postgres, and admin bootstrap are configured, run the strict handoff gate:
+
+```bash
+STAGING_BASE_URL=https://cad-agent.example.com \
+STAGING_BASIC_AUTH_USER=... \
+STAGING_BASIC_AUTH_PASSWORD=... \
+V12_ADMIN_EMAIL=admin@example.com \
+V12_ADMIN_CREDENTIAL_PATH=/opt/bilnd123-cad-agent-workspace/admin-credential.txt \
+npm run handoff:check -- --output outputs/reports/v12-handoff-check.json
+```
+
+The gate verifies:
+
+- the public URL uses HTTPS
+- authenticated `/api/health` reports `httpsConfigured: true`, `accessMode: "https"`, no warning, runner true, llm true, output writable true
+- health reports `dataLayer.mode: "postgres"` and `productionReady: true`
+- `/sign-in` renders Clerk UI instead of the placeholder
+- `/app` and `/admin` do not return 200 when only the outer staging Basic Auth is satisfied and no Clerk session exists
+- admin email and password delivery path are declared
+
+This command intentionally fails against the temporary HTTP + Basic Auth staging posture. Use `smoke:staging` for temporary HTTP smoke checks; use `handoff:check` only for the final v1.2 SaaS access handoff claim.
+
 ## Logs
 
 Run history is appended to:
