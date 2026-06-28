@@ -250,6 +250,12 @@ Verify that evidence before handoff:
 npm run admin:flow:verify -- --input outputs/reports/v12-admin-flow-evidence.json --output outputs/reports/v12-admin-flow-verify.json
 ```
 
+Audit the server-only `.env` before handoff. This report prints only booleans, file modes, and blockers; it must not print the actual Clerk keys, Basic Auth password, `DATABASE_URL`, or admin password.
+
+```bash
+npm run handoff:env:audit -- --env-file .env --output outputs/reports/v12-env-audit.md --json outputs/reports/v12-env-audit.json
+```
+
 Then run the strict handoff gate:
 
 ```bash

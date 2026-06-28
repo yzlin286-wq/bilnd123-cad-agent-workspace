@@ -144,6 +144,7 @@ npm run runs:summary
 npm run failures:export
 npm run staging:report
 npm run staging:protocol
+npm run handoff:env:audit
 npm run handoff:preflight
 npm run handoff:check
 npm run release:check
@@ -200,6 +201,7 @@ Observation tools:
 - `npm run staging:protocol`: dry-run the 20-prompt internal trial protocol at `outputs/protocol/latest.json`
 - `npm run admin:verify`: verify the declared Clerk admin exists, has password login, and is authorized as admin
 - `npm run admin:flow:verify`: verify sanitized evidence for admin login, `/admin`, project create, package download, and cross-owner artifact denial
+- `npm run handoff:env:audit`: audit the server-only `.env` and admin credential file permissions without printing secrets
 - `npm run handoff:preflight`: render the private v1.2 access handoff status in the requested Access/Admin format
 - `npm run handoff:check`: strict v1.2 SaaS access handoff gate for HTTPS, Clerk, Postgres, and admin credential delivery
 - `npm run handoff:report`: render a sanitized v1.2 handoff report from `outputs/reports/v12-handoff-check.json`
@@ -249,6 +251,8 @@ npm run admin:flow:verify -- --input outputs/reports/v12-admin-flow-evidence.jso
 Run the v1.2 handoff gate only when a real HTTPS domain and Clerk keys are configured:
 
 ```bash
+npm run handoff:env:audit -- --env-file .env --output outputs/reports/v12-env-audit.md --json outputs/reports/v12-env-audit.json
+
 STAGING_BASE_URL=https://cad-agent.example.com \
 STAGING_BASIC_AUTH_USER=... \
 STAGING_BASIC_AUTH_PASSWORD=... \
