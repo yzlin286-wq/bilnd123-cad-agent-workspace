@@ -28,23 +28,31 @@ export function evaluateV12AccessPreflight({ handoff, env = {} } = {}) {
   const httpsEnabled = observed.httpsConfigured === true;
   const clerkConfigured = auth.clerkConfigured === true;
   const postgresReady = dataLayer.mode === "postgres" && dataLayer.productionReady === true;
+  const adminEmail = stringValue(admin.email) || stringValue(env.V12_ADMIN_EMAIL) || stringValue(env.ADMIN_BOOTSTRAP_EMAIL);
+  const credentialPath =
+    stringValue(admin.credentialPath) || stringValue(env.V12_ADMIN_CREDENTIAL_PATH) || stringValue(env.ADMIN_BOOTSTRAP_CREDENTIAL_PATH);
   const adminIdentityVerified = admin.clerkIdentityVerified === true && admin.clerkAdminAuthorized === true;
   const adminFlowVerified = verification.evidenceVerified === true;
   const adminPageVerified = verification.adminPageVerified === true;
 
   const blockers = [];
-  addBlocker(blockers, !domain, "domain_missing", "缺少正式 HTTPS 域名/DNS 证据，未完成域名访问。");
-  addBlocker(blockers, !isHttpsUrl(domain), "domain_not_https", "Domain URL 必须是 HTTPS。");
-  addBlocker(blockers, !ip, "expected_ip_missing", "缺少服务器公网 IP 证据。");
-  addBlocker(blockers, accessMode !== "https", "access_mode_not_https", "accessMode 必须为 https。");
-  addBlocker(blockers, !httpsEnabled, "https_not_enabled", "authenticated /api/health 必须返回 httpsConfigured=true。");
-  addBlocker(blockers, Boolean(observed.warning), "health_warning_present", "authenticated /api/health 不应返回 HTTP 暴露 warning。");
-  addBlocker(blockers, !clerkConfigured, "clerk_not_configured", "真实 Clerk keys 未配置或 health 未报告 Clerk configured。");
-  addBlocker(blockers, !adminIdentityVerified, "clerk_admin_not_verified", "Clerk 管理员身份未通过 Backend API 验证。");
-  addBlocker(blockers, !adminFlowVerified, "admin_flow_evidence_missing", "缺少真实管理员登录、/admin、项目创建、package 下载和越权 403 的脱敏证据。");
-  addBlocker(blockers, !adminPageVerified, "admin_page_not_verified", "未验证管理员登录后 /admin 返回 200。");
-  addBlocker(blockers, !postgresReady, "postgres_not_ready", "staging 必须使用 productionReady 的 Postgres 数据层。");
-  addBlocker(blockers, handoffRecord.ok !== true, "handoff_gate_failed", "npm run handoff:check 尚未通过。");
+  addBlocker(blockers, !domain, "domain_missing", "A real HTTPS staging domain and DNS evidence are missing.");
+  addBlocker(blockers, !isHttpsUrl(domain), "domain_not_https", "Domain URL must be HTTPS.");
+  addBlocker(blockers, !ip, "expected_ip_missing", "The staging server public IP is not declared.");
+  addBlocker(blockers, accessMode !== "https", "access_mode_not_https", "accessMode must be https for final v1.2 handoff.");
+  addBlocker(blockers, !httpsEnabled, "https_not_enabled", "Authenticated /api/health must return httpsConfigured=true.");
+  addBlocker(blockers, Boolean(observed.warning), "health_warning_present", "Authenticated /api/health must not return an HTTP exposure warning.");
+  addBlocker(blockers, !clerkConfigured, "clerk_not_configured", "Real Clerk keys are not configured or health does not report Clerk configured.");
+  addBlocker(blockers, !adminIdentityVerified, "clerk_admin_not_verified", "The Clerk admin identity has not been verified through the Backend API.");
+  addBlocker(
+    blockers,
+    !adminFlowVerified,
+    "admin_flow_evidence_missing",
+    "Missing sanitized evidence for real admin login, /admin access, project creation, package download, and cross-owner artifact 403.",
+  );
+  addBlocker(blockers, !adminPageVerified, "admin_page_not_verified", "A logged-in admin has not been verified to receive 200 from /admin.");
+  addBlocker(blockers, !postgresReady, "postgres_not_ready", "Staging must use a productionReady Postgres data layer.");
+  addBlocker(blockers, handoffRecord.ok !== true, "handoff_gate_failed", "npm run handoff:check has not passed.");
 
   return {
     ok: blockers.length === 0,
@@ -65,7 +73,7 @@ export function evaluateV12AccessPreflight({ handoff, env = {} } = {}) {
       },
     },
     admin: {
-      email: stringValue(admin.email) || stringValue(env.V12_ADMIN_EMAIL) || stringValue(env.ADMIN_BOOTSTRAP_EMAIL),
+      email: adminEmail,
       passwordDelivery: passwordDeliveryText(admin, env),
       passwordRotationRequired: Boolean(stringValue(admin.passwordDelivery) || env.V12_ADMIN_PASSWORD_DELIVERY || env.ADMIN_BOOTSTRAP_PASSWORD_DELIVERY),
       adminVerified: adminPageVerified,
@@ -86,6 +94,12 @@ export function evaluateV12AccessPreflight({ handoff, env = {} } = {}) {
       failed: numberValue(summary.failed),
       failedChecks,
     },
+    requiredInputs: requiredInputsFor(blockers, {
+      adminEmail,
+      credentialPath,
+      domain,
+      ip,
+    }),
     blockers,
   };
 }
@@ -96,6 +110,7 @@ export function renderV12AccessPreflight(report) {
   const admin = record(report?.admin);
   const dataLayer = record(report?.dataLayer);
   const handoff = record(report?.handoff);
+  const requiredInputs = arrayValue(report?.requiredInputs);
   const blockers = arrayValue(report?.blockers);
   const lines = [
     "# v1.2 SaaS Access Preflight",
@@ -136,6 +151,10 @@ export function renderV12AccessPreflight(report) {
     `- handoff:check: ${handoff.ok === true ? "passed" : "failed"}`,
     `- Checks: ${numberValue(handoff.passed)}/${numberValue(handoff.total)} passed`,
     "",
+    "## Required External Inputs",
+    "",
+    ...requiredInputLines(requiredInputs),
+    "",
     "## Blockers",
     "",
     ...(blockers.length ? blockers.map((blocker) => `- ${stringValue(blocker.id)}: ${stringValue(blocker.message)}`) : ["- None"]),
@@ -154,7 +173,15 @@ async function main() {
   if (options.json) {
     await writeText(options.json, `${JSON.stringify(result, null, 2)}\n`);
   }
-  console.log(JSON.stringify({ ok: result.ok, output, json: options.json || "", blockers: result.blockers.map((blocker) => blocker.id) }));
+  console.log(
+    JSON.stringify({
+      ok: result.ok,
+      output,
+      json: options.json || "",
+      blockers: result.blockers.map((blocker) => blocker.id),
+      requiredInputs: result.requiredInputs.map((item) => item.id),
+    }),
+  );
   process.exitCode = result.ok ? 0 : 1;
 }
 
@@ -166,9 +193,73 @@ function passwordDeliveryText(admin, env) {
   return "";
 }
 
+function requiredInputsFor(blockers, context) {
+  const failedIds = new Set(blockers.map((blocker) => blocker.id));
+  const items = [];
+  if (failedIds.has("domain_missing") || failedIds.has("domain_not_https") || failedIds.has("expected_ip_missing")) {
+    items.push({
+      id: "domain_dns",
+      label: "Staging domain and DNS",
+      required: true,
+      detail: context.domain
+        ? `Use ${context.domain} and confirm it resolves to ${context.ip || "the staging public IP"}.`
+        : "Provide a real staging domain or subdomain and create an A record to the staging public IP.",
+    });
+  }
+  if (failedIds.has("access_mode_not_https") || failedIds.has("https_not_enabled") || failedIds.has("health_warning_present")) {
+    items.push({
+      id: "https_tls",
+      label: "HTTPS/TLS activation",
+      required: true,
+      detail: "Enable Caddy or an equivalent reverse proxy, redirect HTTP to HTTPS, then set STAGING_HTTPS_ENABLED=1 and STAGING_ACCESS_MODE=https.",
+    });
+  }
+  if (failedIds.has("clerk_not_configured")) {
+    items.push({
+      id: "clerk_keys",
+      label: "Real Clerk keys",
+      required: true,
+      detail: "Configure CLERK_SECRET_KEY and NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY on the server and rebuild the Docker image.",
+    });
+  }
+  if (failedIds.has("clerk_admin_not_verified") || failedIds.has("admin_page_not_verified")) {
+    items.push({
+      id: "clerk_admin",
+      label: "Real Clerk admin user",
+      required: true,
+      detail: context.adminEmail
+        ? `Bootstrap and verify Clerk admin ${context.adminEmail}; deliver the one-time password through ${context.credentialPath || "a secure channel"}.`
+        : "Choose an admin email, run npm run admin:bootstrap with a one-time password, and verify it with npm run admin:verify.",
+    });
+  }
+  if (failedIds.has("admin_flow_evidence_missing")) {
+    items.push({
+      id: "admin_flow_evidence",
+      label: "Admin browser-flow evidence",
+      required: true,
+      detail: "Capture sanitized evidence for admin login, /admin 200, project creation, package.zip download, non-admin denial, and cross-owner artifact 403.",
+    });
+  }
+  if (failedIds.has("postgres_not_ready")) {
+    items.push({
+      id: "postgres",
+      label: "Postgres data layer",
+      required: true,
+      detail: "Configure DATABASE_URL, run migrations, and confirm health reports dataLayer.mode=postgres with schemaReady=true.",
+    });
+  }
+  return items;
+}
+
+function requiredInputLines(items) {
+  if (!items.length) return ["- None"];
+  return items.map((item) => `- ${stringValue(item.id)}: ${stringValue(item.label)} - ${stringValue(item.detail)}`);
+}
+
 function domainUrlFromEnv(env) {
   const domain = stringValue(env.STAGING_DOMAIN);
   if (!domain) return "";
+  if (domain.startsWith("http://") || domain.startsWith("https://")) return domain;
   return `https://${domain}`;
 }
 
@@ -216,8 +307,10 @@ function redactSecrets(text) {
     .replace(/\bBasic\s+(?!Auth\b)[A-Za-z0-9._~+/-]{6,}=*/gi, "Basic [redacted]")
     .replace(/("password"\s*:\s*)"[^"]*"/gi, '$1"[redacted]"')
     .replace(/(password=)[^\s]+/gi, "$1[redacted]")
+    .replace(/(ADMIN_BOOTSTRAP_PASSWORD=)[^\s]+/gi, "$1[redacted]")
     .replace(/(STAGING_BASIC_AUTH_PASSWORD=)[^\s]+/gi, "$1[redacted]")
     .replace(/(CLERK_SECRET_KEY=)[^\s]+/gi, "$1[redacted]")
+    .replace(/(NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=)[^\s]+/gi, "$1[redacted]")
     .replace(/(DATABASE_URL=)[^\s]+/gi, "$1[redacted]");
 }
 

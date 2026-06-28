@@ -30,11 +30,19 @@ test("v1.2 access preflight rejects current HTTP Basic Auth fallback posture", (
   assert.match(report.blockers.map((blocker) => blocker.id).join(","), /domain_missing/);
   assert.match(report.blockers.map((blocker) => blocker.id).join(","), /clerk_not_configured/);
   assert.match(report.blockers.map((blocker) => blocker.id).join(","), /admin_flow_evidence_missing/);
+  assert.match(report.requiredInputs.map((item) => item.id).join(","), /domain_dns/);
+  assert.match(report.requiredInputs.map((item) => item.id).join(","), /https_tls/);
+  assert.match(report.requiredInputs.map((item) => item.id).join(","), /clerk_keys/);
+  assert.match(report.requiredInputs.map((item) => item.id).join(","), /admin_flow_evidence/);
 
   const markdown = renderV12AccessPreflight(report);
   assert.match(markdown, /Status: not ready/);
   assert.match(markdown, /Domain: not configured/);
   assert.match(markdown, /Data layer: postgres/);
+  assert.match(markdown, /Required External Inputs/);
+  assert.match(markdown, /domain_dns: Staging domain and DNS/);
+  assert.match(markdown, /clerk_keys: Real Clerk keys/);
+  assert.equal(markdown.includes("缂"), false);
 });
 
 test("v1.2 access preflight renders ready access and admin handoff without secrets", () => {
@@ -71,6 +79,7 @@ test("v1.2 access preflight renders ready access and admin handoff without secre
 
   assert.equal(report.ok, true);
   assert.equal(report.blockers.length, 0);
+  assert.equal(report.requiredInputs.length, 0);
 
   const markdown = renderV12AccessPreflight(report);
   assert.match(markdown, /Status: ready/);

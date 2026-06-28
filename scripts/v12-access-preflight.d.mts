@@ -38,6 +38,12 @@ export type V12AccessPreflightReport = {
     failed: number;
     failedChecks: string[];
   };
+  requiredInputs: Array<{
+    id: string;
+    label: string;
+    required: boolean;
+    detail: string;
+  }>;
   blockers: Array<{
     id: string;
     message: string;
