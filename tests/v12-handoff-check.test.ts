@@ -10,6 +10,11 @@ import test from "node:test";
 test("handoff:check fails the current HTTP Basic Auth fallback posture without leaking credentials", async () => {
   const server = createServer((request, response) => {
     if (request.url === "/api/health") {
+      if (!request.headers.authorization) {
+        response.statusCode = 401;
+        response.end("Authentication required");
+        return;
+      }
       response.setHeader("content-type", "application/json");
       response.end(
         JSON.stringify({
@@ -75,6 +80,10 @@ test("handoff:check fails the current HTTP Basic Auth fallback posture without l
     assert.equal(report.ok, false);
     assert.equal(report.baseUrl, `http://127.0.0.1:${port}`);
     assert.match(failedIds.join(","), /base_url_https/);
+    assert.match(failedIds.join(","), /base_url_uses_domain/);
+    assert.match(failedIds.join(","), /expected_ip_declared/);
+    assert.match(failedIds.join(","), /domain_resolves_expected_ip/);
+    assert.match(failedIds.join(","), /http_redirects_to_https/);
     assert.match(failedIds.join(","), /health_https_configured/);
     assert.match(failedIds.join(","), /health_access_mode_https/);
     assert.match(failedIds.join(","), /health_clerk_configured/);
@@ -91,6 +100,10 @@ test("handoff:check fails the current HTTP Basic Auth fallback posture without l
         "scripts/v12-handoff-check.mjs",
         "--base-url",
         `http://127.0.0.1:${port}`,
+        "--expected-ip",
+        "127.0.0.1",
+        "--ip-fallback-url",
+        `http://127.0.0.1:${port}`,
         "--admin-email",
         "admin@example.com",
         "--credential-path",
@@ -98,13 +111,22 @@ test("handoff:check fails the current HTTP Basic Auth fallback posture without l
         "--output",
         outputPath,
       ],
-      { cwd: process.cwd() },
+      {
+        cwd: process.cwd(),
+        env: {
+          ...process.env,
+          STAGING_BASIC_AUTH_USER: "cad-admin",
+          STAGING_BASIC_AUTH_PASSWORD: "do-not-print-this",
+        },
+      },
     );
     assert.equal(missingCredentialResult.code, 1);
     const credentialReport = JSON.parse(readFileSync(outputPath, "utf8"));
     const credentialFailedIds = credentialReport.checks
       .filter((check: { ok: boolean }) => !check.ok)
       .map((check: { id: string }) => check.id);
+    assert.equal(credentialReport.checks.find((check: { id: string }) => check.id === "ip_fallback_unauth_401")?.ok, true);
+    assert.equal(credentialReport.checks.find((check: { id: string }) => check.id === "ip_fallback_health_200")?.ok, true);
     assert.match(credentialFailedIds.join(","), /admin_credential_file_exists/);
     assert.match(credentialFailedIds.join(","), /admin_credential_file_private/);
   } finally {

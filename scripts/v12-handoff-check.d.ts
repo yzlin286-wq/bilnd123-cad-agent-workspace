@@ -8,6 +8,8 @@ export type V12HandoffResult = {
   ok: boolean;
   generatedAt: string;
   baseUrl: string;
+  expectedIp: string;
+  ipFallbackUrl: string;
   summary: {
     total: number;
     passed: number;

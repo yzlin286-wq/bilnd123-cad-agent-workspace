@@ -204,13 +204,15 @@ Run the v1.2 handoff gate only when a real HTTPS domain and Clerk keys are confi
 STAGING_BASE_URL=https://cad-agent.example.com \
 STAGING_BASIC_AUTH_USER=... \
 STAGING_BASIC_AUTH_PASSWORD=... \
+V12_EXPECTED_IP=203.0.113.10 \
+V12_IP_FALLBACK_URL=http://203.0.113.10:12602 \
 V12_ADMIN_EMAIL=admin@example.com \
 V12_ADMIN_PASSWORD_DELIVERY=server_file \
 V12_ADMIN_CREDENTIAL_PATH=/opt/bilnd123-cad-agent-workspace/admin-credential.txt \
 npm run handoff:check -- --output outputs/reports/v12-handoff-check.json
 ```
 
-This check intentionally fails for the temporary HTTP + Basic Auth staging posture. It must not be used to claim handoff completion until it passes against the real HTTPS/Clerk deployment. When `V12_ADMIN_PASSWORD_DELIVERY=server_file`, run the check on the staging host so it can verify the credential file exists and is not readable by group/world users. Use `V12_ADMIN_PASSWORD_DELIVERY=secure_channel` only when the password was delivered out of band.
+This check intentionally fails for the temporary HTTP + Basic Auth staging posture. It verifies that the HTTPS URL uses a real domain, the domain resolves to `V12_EXPECTED_IP`, HTTP redirects to HTTPS, and the optional IP fallback remains Basic Auth protected. It must not be used to claim handoff completion until it passes against the real HTTPS/Clerk deployment. When `V12_ADMIN_PASSWORD_DELIVERY=server_file`, run the check on the staging host so it can verify the credential file exists and is not readable by group/world users. Use `V12_ADMIN_PASSWORD_DELIVERY=secure_channel` only when the password was delivered out of band.
 
 Dev fallback persistence and feedback files live in the staging log volume only when `DATABASE_URL` is absent:
 

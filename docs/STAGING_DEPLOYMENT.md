@@ -212,6 +212,8 @@ After the real HTTPS domain, Clerk keys, Postgres, and admin bootstrap are confi
 STAGING_BASE_URL=https://cad-agent.example.com \
 STAGING_BASIC_AUTH_USER=... \
 STAGING_BASIC_AUTH_PASSWORD=... \
+V12_EXPECTED_IP=203.0.113.10 \
+V12_IP_FALLBACK_URL=http://203.0.113.10:12602 \
 V12_ADMIN_EMAIL=admin@example.com \
 V12_ADMIN_PASSWORD_DELIVERY=server_file \
 V12_ADMIN_CREDENTIAL_PATH=/opt/bilnd123-cad-agent-workspace/admin-credential.txt \
@@ -221,6 +223,10 @@ npm run handoff:check -- --output outputs/reports/v12-handoff-check.json
 The gate verifies:
 
 - the public URL uses HTTPS
+- the public URL uses a real domain rather than a raw IP
+- the domain resolves to `V12_EXPECTED_IP`
+- HTTP redirects to the HTTPS staging URL
+- when `V12_IP_FALLBACK_URL` is set, unauthenticated `/api/health` returns `401` and authenticated `/api/health` returns `200`
 - authenticated `/api/health` reports `httpsConfigured: true`, `accessMode: "https"`, no warning, runner true, llm true, output writable true
 - health reports `auth.clerkConfigured: true` and `auth.devBypassEnabled: false`
 - health reports `dataLayer.mode: "postgres"` and `productionReady: true`

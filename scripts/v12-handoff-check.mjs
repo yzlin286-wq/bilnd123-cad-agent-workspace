@@ -1,14 +1,24 @@
 #!/usr/bin/env node
 
+import dns from "node:dns/promises";
 import { existsSync } from "node:fs";
 import { mkdir, stat, writeFile } from "node:fs/promises";
+import { isIP } from "node:net";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const DEFAULT_OUTPUT = "outputs/reports/v12-handoff-check.json";
+const REQUEST_TIMEOUT_MS = 15_000;
 
 export function evaluateV12Handoff({
   baseUrl,
+  expectedIp,
+  dnsResolution,
+  httpRedirect,
+  ipFallbackUrl,
+  ipFallbackUnauthStatus,
+  ipFallbackHealthStatus,
+  ipFallbackHealth,
   healthStatus,
   health,
   signInStatus,
@@ -24,14 +34,38 @@ export function evaluateV12Handoff({
 } = {}) {
   const checks = [];
   const normalizedBaseUrl = safeUrl(baseUrl);
+  const normalizedIpFallbackUrl = safeUrl(ipFallbackUrl);
   const healthRecord = record(health);
+  const fallbackHealthRecord = record(ipFallbackHealth);
   const dataLayer = record(healthRecord.dataLayer);
   const auth = record(healthRecord.auth);
+  const dnsRecord = record(dnsResolution);
+  const httpRedirectRecord = record(httpRedirect);
   const normalizedDelivery = normalizePasswordDelivery(passwordDelivery, credentialPath);
   const credentialRecord = record(credentialInspection);
 
   add(checks, "base_url_present", Boolean(baseUrl), "A staging base URL is required.");
   add(checks, "base_url_https", isHttpsUrl(baseUrl), "The v1.2 handoff URL must use HTTPS.");
+  add(checks, "base_url_uses_domain", isDomainUrl(baseUrl), "The v1.2 handoff URL must use a real domain, not an IP address.");
+  add(checks, "expected_ip_declared", Boolean(expectedIp), "The staging server public IP must be declared.");
+  add(
+    checks,
+    "domain_resolves_expected_ip",
+    Boolean(expectedIp && dnsRecord.addresses?.includes(expectedIp)),
+    "The staging domain must resolve to the declared server IP.",
+  );
+  add(
+    checks,
+    "http_redirects_to_https",
+    isHttpsRedirect(httpRedirectRecord, baseUrl),
+    "HTTP must redirect to the HTTPS staging URL.",
+  );
+  if (ipFallbackUrl) {
+    add(checks, "ip_fallback_url_safe", normalizedIpFallbackUrl !== "[invalid-url]", "The IP fallback URL must be valid when declared.");
+    add(checks, "ip_fallback_unauth_401", ipFallbackUnauthStatus === 401, "Unauthenticated IP fallback /api/health must return 401.");
+    add(checks, "ip_fallback_health_200", ipFallbackHealthStatus === 200, "Authenticated IP fallback /api/health must return 200.");
+    add(checks, "ip_fallback_app_ok", fallbackHealthRecord.app === "ok", "Authenticated IP fallback health must report app=ok.");
+  }
   add(checks, "health_reachable", healthStatus === 200, "Authenticated /api/health must return 200.");
   add(checks, "health_app_ok", healthRecord.app === "ok", "Health must report app=ok.");
   add(checks, "health_runner_configured", healthRecord.cadRunnerConfigured === true, "CAD runner must be configured.");
@@ -87,6 +121,8 @@ export function evaluateV12Handoff({
     ok: failed.length === 0,
     generatedAt: new Date().toISOString(),
     baseUrl: normalizedBaseUrl,
+    expectedIp: expectedIp || "",
+    ipFallbackUrl: normalizedIpFallbackUrl,
     summary: {
       total: checks.length,
       passed: checks.length - failed.length,
@@ -120,18 +156,28 @@ async function main() {
   const options = parseArgs(process.argv.slice(2));
   const baseUrl = options.baseUrl || process.env.STAGING_BASE_URL;
   const output = options.output || DEFAULT_OUTPUT;
+  const expectedIp = options.expectedIp || process.env.V12_EXPECTED_IP;
+  const ipFallbackUrl = options.ipFallbackUrl || process.env.V12_IP_FALLBACK_URL;
   const adminEmail = options.adminEmail || process.env.ADMIN_BOOTSTRAP_EMAIL || process.env.V12_ADMIN_EMAIL;
   const credentialPath = options.credentialPath || process.env.ADMIN_BOOTSTRAP_CREDENTIAL_PATH || process.env.V12_ADMIN_CREDENTIAL_PATH;
   const passwordDelivery =
     options.passwordDelivery || process.env.ADMIN_BOOTSTRAP_PASSWORD_DELIVERY || process.env.V12_ADMIN_PASSWORD_DELIVERY;
   const authHeader = basicAuthHeader(process.env.STAGING_BASIC_AUTH_USER, process.env.STAGING_BASIC_AUTH_PASSWORD);
   const probe = baseUrl ? await probeStaging(baseUrl, authHeader) : {};
+  const dnsResolution = baseUrl ? await resolveBaseUrlHost(baseUrl) : undefined;
+  const httpRedirect = baseUrl ? await probeHttpRedirect(baseUrl) : undefined;
+  const ipFallbackProbe = ipFallbackUrl ? await probeIpFallback(ipFallbackUrl, authHeader) : {};
   const credentialInspection = credentialPath ? await inspectCredentialFile(credentialPath) : undefined;
   const result = evaluateV12Handoff({
     baseUrl,
+    expectedIp,
+    ipFallbackUrl,
     adminEmail,
     credentialPath,
     passwordDelivery,
+    dnsResolution,
+    httpRedirect,
+    ...ipFallbackProbe,
     credentialInspection,
     ...probe,
   });
@@ -159,9 +205,52 @@ async function probeStaging(baseUrl, authHeader) {
   };
 }
 
+async function probeIpFallback(ipFallbackUrl, authHeader) {
+  const unauth = await requestJson(new URL("/api/health", ipFallbackUrl), {});
+  const authenticated = await requestJson(new URL("/api/health", ipFallbackUrl), authHeader ? { authorization: authHeader } : {});
+  return {
+    ipFallbackUnauthStatus: unauth.status,
+    ipFallbackHealthStatus: authenticated.status,
+    ipFallbackHealth: authenticated.body,
+  };
+}
+
+async function probeHttpRedirect(baseUrl) {
+  try {
+    const httpsUrl = new URL(baseUrl);
+    const httpUrl = new URL(baseUrl);
+    httpUrl.protocol = "http:";
+    httpUrl.username = "";
+    httpUrl.password = "";
+    httpUrl.pathname = "/";
+    httpUrl.search = "";
+    const response = await fetch(httpUrl, { redirect: "manual", signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
+    return {
+      status: response.status,
+      location: safeUrl(response.headers.get("location") || ""),
+      expectedPrefix: safeUrl(httpsUrl.toString()),
+    };
+  } catch (error) {
+    return { status: 0, error: error instanceof Error ? error.name : "FetchError" };
+  }
+}
+
+async function resolveBaseUrlHost(baseUrl) {
+  try {
+    const { hostname } = new URL(baseUrl);
+    if (isIP(hostname)) {
+      return { hostname, addresses: [hostname] };
+    }
+    const records = await dns.lookup(hostname, { all: true });
+    return { hostname, addresses: [...new Set(records.map((record) => record.address))] };
+  } catch (error) {
+    return { addresses: [], error: error instanceof Error ? error.name : "DnsResolutionError" };
+  }
+}
+
 async function requestJson(url, headers) {
   try {
-    const response = await fetch(url, { headers, redirect: "manual" });
+    const response = await fetch(url, { headers, redirect: "manual", signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
     const text = await response.text();
     return { status: response.status, body: parseJson(text), location: response.headers.get("location") || "" };
   } catch (error) {
@@ -171,7 +260,7 @@ async function requestJson(url, headers) {
 
 async function requestText(url, headers, redirect = "follow") {
   try {
-    const response = await fetch(url, { headers, redirect });
+    const response = await fetch(url, { headers, redirect, signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
     return { status: response.status, body: await response.text(), location: response.headers.get("location") || "" };
   } catch (error) {
     return { status: 0, body: error instanceof Error ? error.name : "FetchError", location: "" };
@@ -197,6 +286,8 @@ function parseArgs(args) {
     const arg = args[index];
     if (arg === "--base-url") options.baseUrl = args[++index];
     else if (arg === "--output") options.output = args[++index];
+    else if (arg === "--expected-ip") options.expectedIp = args[++index];
+    else if (arg === "--ip-fallback-url") options.ipFallbackUrl = args[++index];
     else if (arg === "--admin-email") options.adminEmail = args[++index];
     else if (arg === "--credential-path") options.credentialPath = args[++index];
     else if (arg === "--password-delivery") options.passwordDelivery = args[++index];
@@ -236,6 +327,26 @@ function add(checks, id, ok, message) {
 function isHttpsUrl(value) {
   try {
     return new URL(value).protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+function isDomainUrl(value) {
+  try {
+    const { hostname } = new URL(value);
+    return Boolean(hostname && !isIP(hostname));
+  } catch {
+    return false;
+  }
+}
+
+function isHttpsRedirect(redirect, baseUrl) {
+  if (![301, 302, 307, 308].includes(Number(redirect.status))) return false;
+  const location = typeof redirect.location === "string" ? redirect.location : "";
+  if (!location.startsWith("https://")) return false;
+  try {
+    return new URL(location).hostname === new URL(baseUrl).hostname;
   } catch {
     return false;
   }
