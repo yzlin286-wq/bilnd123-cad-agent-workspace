@@ -326,6 +326,7 @@ The gate verifies:
 - health reports the deployed `APP_COMMIT_SHA`, and it matches `--expected-commit`
 - `/sign-in` and `/sign-up` render Clerk UI instead of the placeholder
 - `/app` and `/admin` do not return 200 when only the outer staging Basic Auth is satisfied and no Clerk session exists
+- `/api/projects` rejects the request when only the outer staging Basic Auth is satisfied and no Clerk session exists
 - admin email and password delivery are declared
 - when `V12_ADMIN_PASSWORD_DELIVERY=server_file`, the credential file exists and is not readable by group/world users
 - `npm run admin:verify` confirms the declared Clerk user exists, has password login enabled, is not banned or locked, and is authorized as admin by metadata or allowlist

@@ -49,6 +49,11 @@ test("handoff:check fails the current HTTP Basic Auth fallback posture without l
       response.end("<main>Basic Auth fallback page</main>");
       return;
     }
+    if (request.url === "/api/projects") {
+      response.setHeader("content-type", "application/json");
+      response.end(JSON.stringify({ projects: [] }));
+      return;
+    }
     response.statusCode = 404;
     response.end("not found");
   });
@@ -96,6 +101,7 @@ test("handoff:check fails the current HTTP Basic Auth fallback posture without l
     assert.match(failedIds.join(","), /clerk_sign_up_rendered/);
     assert.match(failedIds.join(","), /app_requires_clerk_session/);
     assert.match(failedIds.join(","), /admin_requires_clerk_session/);
+    assert.match(failedIds.join(","), /projects_api_requires_clerk_session/);
     assert.match(failedIds.join(","), /admin_email_declared/);
     assert.match(failedIds.join(","), /clerk_admin_email_matches/);
     assert.match(failedIds.join(","), /admin_password_delivery_declared/);

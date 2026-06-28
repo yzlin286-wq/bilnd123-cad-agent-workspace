@@ -102,6 +102,9 @@ function actionItems(checks) {
   if (failedIds.has("health_clerk_configured") || failedIds.has("clerk_sign_in_rendered") || failedIds.has("clerk_sign_up_rendered")) {
     items.push("- Configure real Clerk keys and bootstrap a real admin user.");
   }
+  if (failedIds.has("app_requires_clerk_session") || failedIds.has("admin_requires_clerk_session") || failedIds.has("projects_api_requires_clerk_session")) {
+    items.push("- Verify Clerk session protection for /app, /admin, and project APIs with only the outer staging gate satisfied.");
+  }
   if (failedIds.has("clerk_admin_identity_verified") || failedIds.has("clerk_admin_email_matches")) {
     items.push("- Run npm run admin:verify for the declared admin email and pass its matching output to handoff:check.");
   }

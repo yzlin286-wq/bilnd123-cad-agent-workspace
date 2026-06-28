@@ -30,6 +30,8 @@ export function evaluateV12Handoff({
   appLocation,
   adminStatus,
   adminLocation,
+  projectsApiStatus,
+  projectsApiLocation,
   adminEmail,
   credentialPath,
   passwordDelivery,
@@ -140,6 +142,12 @@ export function evaluateV12Handoff({
     "admin_requires_clerk_session",
     isProtectedResponse(adminStatus, adminLocation),
     "With the outer staging gate satisfied but no Clerk session, /admin must redirect/block instead of returning 200.",
+  );
+  add(
+    checks,
+    "projects_api_requires_clerk_session",
+    isProtectedResponse(projectsApiStatus, projectsApiLocation),
+    "With the outer staging gate satisfied but no Clerk session, /api/projects must reject the request.",
   );
   add(checks, "admin_email_declared", Boolean(adminEmail), "A Clerk admin email must be declared for handoff.");
   add(
@@ -350,6 +358,7 @@ async function probeStaging(baseUrl, authHeader) {
   const signUpResponse = await requestText(new URL("/sign-up", baseUrl), headers);
   const appResponse = await requestText(new URL("/app", baseUrl), headers, "manual");
   const adminResponse = await requestText(new URL("/admin", baseUrl), headers, "manual");
+  const projectsApiResponse = await requestJson(new URL("/api/projects", baseUrl), headers);
   return {
     healthStatus: healthResponse.status,
     health: healthResponse.body,
@@ -361,6 +370,8 @@ async function probeStaging(baseUrl, authHeader) {
     appLocation: appResponse.location,
     adminStatus: adminResponse.status,
     adminLocation: adminResponse.location,
+    projectsApiStatus: projectsApiResponse.status,
+    projectsApiLocation: projectsApiResponse.location,
   };
 }
 
