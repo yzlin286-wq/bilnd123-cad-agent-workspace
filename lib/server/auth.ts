@@ -77,10 +77,20 @@ export function appRouteAccess(auth: AuthContext): "allow" | "sign_in" {
   return auth.isAuthenticated ? "allow" : "sign_in";
 }
 
+export function signInRedirectPath(returnPath = "/app") {
+  const params = new URLSearchParams();
+  params.set("redirect_url", safeInternalReturnPath(returnPath));
+  return `/sign-in?${params.toString()}`;
+}
+
 export function redirectToSignIn(pathname = "/app") {
-  const url = new URL("/sign-in", "http://localhost");
-  url.searchParams.set("redirect_url", pathname);
+  const url = new URL(signInRedirectPath(pathname), "http://localhost");
   return NextResponse.redirect(url);
+}
+
+function safeInternalReturnPath(value: string) {
+  if (!value.startsWith("/") || value.startsWith("//")) return "/app";
+  return value;
 }
 
 async function clerkAuthContext(): Promise<AuthContext> {

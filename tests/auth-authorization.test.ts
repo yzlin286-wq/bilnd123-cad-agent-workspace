@@ -3,7 +3,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import test from "node:test";
 import { CAD_OUTPUT_ROOT, artifactIdFromPath } from "../lib/cad/artifacts";
-import { adminRouteAccess, appRouteAccess, canAccessProject, getRequestAuthContext } from "../lib/server/auth";
+import { adminRouteAccess, appRouteAccess, canAccessProject, getRequestAuthContext, signInRedirectPath } from "../lib/server/auth";
 import { GET as getArtifact } from "../app/api/artifacts/[id]/route";
 
 const PROJECT_STORE_PATH = path.resolve(process.cwd(), "logs", "projects.json");
@@ -32,6 +32,12 @@ test("app route access requires an authenticated SaaS user", () => {
   assert.equal(appRouteAccess({ isAuthenticated: false, isAdmin: false }), "sign_in");
   assert.equal(appRouteAccess({ isAuthenticated: true, userId: "member", isAdmin: false }), "allow");
   assert.equal(appRouteAccess({ isAuthenticated: true, userId: "admin", isAdmin: true }), "allow");
+});
+
+test("sign-in redirect path preserves internal return targets only", () => {
+  assert.equal(signInRedirectPath("/app/workspace?projectId=abc&template=l_bracket"), "/sign-in?redirect_url=%2Fapp%2Fworkspace%3FprojectId%3Dabc%26template%3Dl_bracket");
+  assert.equal(signInRedirectPath("https://evil.example/app"), "/sign-in?redirect_url=%2Fapp");
+  assert.equal(signInRedirectPath("//evil.example/app"), "/sign-in?redirect_url=%2Fapp");
 });
 
 test("artifact download requires auth and project ownership", async () => {

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Search } from "lucide-react";
 import { UserMenu } from "@/components/auth/UserMenu";
-import { appRouteAccess, getPageAuthContext } from "@/lib/server/auth";
+import { appRouteAccess, getPageAuthContext, signInRedirectPath } from "@/lib/server/auth";
 import { listProjects } from "@/lib/server/project-store";
 import { redirect } from "next/navigation";
 
@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 export default async function ProjectsPage() {
   const auth = await getPageAuthContext();
   if (appRouteAccess(auth) === "sign_in") {
-    redirect("/sign-in?redirect_url=/app/projects");
+    redirect(signInRedirectPath("/app/projects"));
   }
   const projects = await listProjects({ auth, limit: 50 });
 

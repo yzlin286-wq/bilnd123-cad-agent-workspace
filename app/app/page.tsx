@@ -3,7 +3,7 @@ import { AlertTriangle, ArrowRight, Box, FileArchive, Gauge, History, Plus, Uplo
 import type { ReactNode } from "react";
 import { UserMenu } from "@/components/auth/UserMenu";
 import { getAdminSummary } from "@/lib/server/admin-summary";
-import { appRouteAccess, getPageAuthContext } from "@/lib/server/auth";
+import { appRouteAccess, getPageAuthContext, signInRedirectPath } from "@/lib/server/auth";
 import { listProjects, recentArtifacts } from "@/lib/server/project-store";
 import { redirect } from "next/navigation";
 
@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 export default async function AppDashboardPage() {
   const auth = await getPageAuthContext();
   if (appRouteAccess(auth) === "sign_in") {
-    redirect("/sign-in?redirect_url=/app");
+    redirect(signInRedirectPath("/app"));
   }
   const [projects, artifacts, summary] = await Promise.all([
     listProjects({ auth, limit: 8 }),
