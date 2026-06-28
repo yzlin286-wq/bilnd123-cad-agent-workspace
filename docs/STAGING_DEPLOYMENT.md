@@ -256,6 +256,12 @@ Audit the server-only `.env` before handoff. This report prints only booleans, f
 npm run handoff:env:audit -- --env-file .env --output outputs/reports/v12-env-audit.md --json outputs/reports/v12-env-audit.json
 ```
 
+Verify the public DNS and TLS path before running the full handoff gate:
+
+```bash
+npm run handoff:domain:check -- --base-url https://cad-agent.example.com --expected-ip 203.0.113.10 --ip-fallback-url http://203.0.113.10:12602 --output outputs/reports/v12-domain-tls-check.json --markdown outputs/reports/v12-domain-tls-check.md
+```
+
 Then run the strict handoff gate:
 
 ```bash

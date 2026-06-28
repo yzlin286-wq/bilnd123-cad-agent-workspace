@@ -144,6 +144,7 @@ npm run runs:summary
 npm run failures:export
 npm run staging:report
 npm run staging:protocol
+npm run handoff:domain:check
 npm run handoff:env:audit
 npm run handoff:preflight
 npm run handoff:check
@@ -201,6 +202,7 @@ Observation tools:
 - `npm run staging:protocol`: dry-run the 20-prompt internal trial protocol at `outputs/protocol/latest.json`
 - `npm run admin:verify`: verify the declared Clerk admin exists, has password login, and is authorized as admin
 - `npm run admin:flow:verify`: verify sanitized evidence for admin login, `/admin`, project create, package download, and cross-owner artifact denial
+- `npm run handoff:domain:check`: verify DNS, HTTP to HTTPS redirect, HTTPS `/api/health`, and optional IP fallback
 - `npm run handoff:env:audit`: audit the server-only `.env` and admin credential file permissions without printing secrets
 - `npm run handoff:preflight`: render the private v1.2 access handoff status in the requested Access/Admin format
 - `npm run handoff:check`: strict v1.2 SaaS access handoff gate for HTTPS, Clerk, Postgres, and admin credential delivery
@@ -252,6 +254,7 @@ Run the v1.2 handoff gate only when a real HTTPS domain and Clerk keys are confi
 
 ```bash
 npm run handoff:env:audit -- --env-file .env --output outputs/reports/v12-env-audit.md --json outputs/reports/v12-env-audit.json
+npm run handoff:domain:check -- --base-url https://cad-agent.example.com --expected-ip 203.0.113.10 --ip-fallback-url http://203.0.113.10:12602 --output outputs/reports/v12-domain-tls-check.json --markdown outputs/reports/v12-domain-tls-check.md
 
 STAGING_BASE_URL=https://cad-agent.example.com \
 STAGING_BASIC_AUTH_USER=... \
