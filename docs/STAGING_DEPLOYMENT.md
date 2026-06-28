@@ -246,7 +246,7 @@ After real Clerk login testing, capture sanitized admin flow evidence. Do not in
     { "id": "admin_page_access", "ok": true, "status": 200 },
     { "id": "non_admin_admin_blocked", "ok": true, "status": 403 },
     { "id": "admin_project_create", "ok": true, "status": 201, "projectId": "..." },
-    { "id": "admin_package_download", "ok": true, "status": 200, "artifactName": "package.zip", "bytes": 2048 },
+    { "id": "admin_package_download", "ok": true, "status": 200, "artifactName": "package.zip", "projectId": "...", "bytes": 2048 },
     { "id": "artifact_cross_owner_forbidden", "ok": true, "status": 403 }
   ]
 }
@@ -331,6 +331,7 @@ The gate verifies:
 - `npm run admin:verify` confirms the declared Clerk user exists, has password login enabled, is not banned or locked, and is authorized as admin by metadata or allowlist
 - the admin verification report email must match the declared `--admin-email` / `V12_ADMIN_EMAIL`
 - `V12_ADMIN_FLOW_EVIDENCE_PATH` points to the sanitized `admin:flow:verify` output that verifies the real Clerk admin can log in, reach `/admin`, create a CAD project, and download their own `package.zip`
+- the `admin_package_download.projectId` matches the `admin_project_create.projectId`
 - the admin flow evidence commit matches the deployed `APP_COMMIT_SHA`
 - the sanitized evidence verifies a non-admin Clerk user is blocked from `/admin`
 - the sanitized evidence verifies a cross-owner artifact download attempt returns `403`

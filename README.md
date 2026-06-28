@@ -236,6 +236,8 @@ docker compose -f docker-compose.staging.yml exec cad-agent \
 
 Capture a sanitized admin flow evidence file after the real Clerk admin signs in. The evidence must not include cookies, Basic Auth headers, passwords, API keys, full prompts, traceback text, or provider raw errors.
 
+Use the same `projectId` from `admin_project_create` in the `admin_package_download` check so the package download proves the admin can download the project they just created.
+
 ```json
 {
   "generatedAt": "2026-06-28T12:00:00.000Z",
@@ -247,7 +249,7 @@ Capture a sanitized admin flow evidence file after the real Clerk admin signs in
     { "id": "admin_page_access", "ok": true, "status": 200 },
     { "id": "non_admin_admin_blocked", "ok": true, "status": 403 },
     { "id": "admin_project_create", "ok": true, "status": 201, "projectId": "..." },
-    { "id": "admin_package_download", "ok": true, "status": 200, "artifactName": "package.zip", "bytes": 2048 },
+    { "id": "admin_package_download", "ok": true, "status": 200, "artifactName": "package.zip", "projectId": "...", "bytes": 2048 },
     { "id": "artifact_cross_owner_forbidden", "ok": true, "status": 403 }
   ]
 }

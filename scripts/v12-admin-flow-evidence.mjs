@@ -48,11 +48,13 @@ const REQUIRED_CHECKS = [
   {
     id: "admin_package_download",
     flag: "adminPackageDownloadVerified",
-    message: "The admin must be verified to download their own package.zip.",
-    predicate: (check) =>
+    message: "The admin must be verified to download package.zip from the project created in this admin flow.",
+    predicate: (check, context) =>
       check.ok === true &&
       numberValue(check.status) === 200 &&
       stringValue(check.artifactName) === "package.zip" &&
+      Boolean(context.createdProjectId) &&
+      stringValue(check.projectId) === context.createdProjectId &&
       numberValue(check.bytes) > 0,
   },
   {
@@ -78,6 +80,9 @@ export function evaluateAdminFlowEvidence(evidence, { expectedBaseUrl, expectedA
     normalizeCommitSha(evidenceBuild.commitSha) ||
     normalizeCommitSha(evidenceBuild.deployedCommit) ||
     normalizeCommitSha(evidenceRecord.commitSha);
+  const flowContext = {
+    createdProjectId: stringValue(checksById.get("admin_project_create")?.projectId),
+  };
   const secretScan = scanForSecrets(evidenceRecord);
 
   if (!generatedAt || Number.isNaN(Date.parse(generatedAt))) {
@@ -107,7 +112,7 @@ export function evaluateAdminFlowEvidence(evidence, { expectedBaseUrl, expectedA
 
   for (const requirement of REQUIRED_CHECKS) {
     const check = checksById.get(requirement.id);
-    const ok = Boolean(check && requirement.predicate(check));
+    const ok = Boolean(check && requirement.predicate(check, flowContext));
     flags[requirement.flag] = ok;
     if (!ok) {
       issues.push({ id: requirement.id, message: requirement.message });

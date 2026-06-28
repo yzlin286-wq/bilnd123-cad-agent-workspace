@@ -12,7 +12,7 @@ const completeEvidence = {
     { id: "admin_page_access", ok: true, status: 200 },
     { id: "non_admin_admin_blocked", ok: true, status: 302, location: "/app" },
     { id: "admin_project_create", ok: true, status: 201, projectId: "project_123" },
-    { id: "admin_package_download", ok: true, status: 200, artifactName: "package.zip", bytes: 2048 },
+    { id: "admin_package_download", ok: true, status: 200, artifactName: "package.zip", projectId: "project_123", bytes: 2048 },
     { id: "artifact_cross_owner_forbidden", ok: true, status: 403 },
   ],
 };
@@ -46,6 +46,26 @@ test("admin flow evidence rejects mismatched deploy commit", () => {
 
   assert.equal(result.ok, false);
   assert.match(result.issues.map((issue: { id: string }) => issue.id).join(","), /commit_mismatch/);
+});
+
+test("admin flow evidence requires package.zip to belong to the created project", () => {
+  const result = evaluateAdminFlowEvidence(
+    {
+      ...completeEvidence,
+      checks: completeEvidence.checks.map((check) =>
+        check.id === "admin_package_download" ? { ...check, projectId: "other_project" } : check,
+      ),
+    },
+    {
+      expectedBaseUrl: "https://cad-agent.example.com",
+      expectedAdminEmail: "admin@example.com",
+      expectedCommit: "85e517e",
+    },
+  );
+
+  assert.equal(result.ok, false);
+  assert.equal(result.flags.adminPackageDownloadVerified, false);
+  assert.match(result.issues.map((issue: { id: string }) => issue.id).join(","), /admin_package_download/);
 });
 
 test("admin flow evidence rejects secret-like fields and redacts output", () => {
