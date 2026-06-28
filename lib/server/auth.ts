@@ -81,12 +81,12 @@ export function isAdminUser(auth: AuthContext) {
 }
 
 export function adminRouteAccess(auth: AuthContext): "allow" | "sign_in" | "forbidden" {
-  if (!auth.isAuthenticated) return "sign_in";
+  if (!auth.isAuthenticated || !isSaasIdentity(auth)) return "sign_in";
   return isAdminUser(auth) ? "allow" : "forbidden";
 }
 
 export function appRouteAccess(auth: AuthContext): "allow" | "sign_in" {
-  return auth.isAuthenticated ? "allow" : "sign_in";
+  return auth.isAuthenticated && isSaasIdentity(auth) ? "allow" : "sign_in";
 }
 
 export function signInRedirectPath(returnPath = "/app") {

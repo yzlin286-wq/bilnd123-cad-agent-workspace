@@ -30,19 +30,21 @@ test("project access allows owners, org members, and admins only", () => {
 
 test("admin route access allows only authenticated admins", () => {
   assert.equal(adminRouteAccess({ isAuthenticated: false, isAdmin: false }), "sign_in");
-  assert.equal(adminRouteAccess({ isAuthenticated: true, userId: "member", isAdmin: false }), "forbidden");
-  assert.equal(adminRouteAccess({ isAuthenticated: true, userId: "admin", isAdmin: true }), "allow");
+  assert.equal(adminRouteAccess({ isAuthenticated: true, source: "clerk", userId: "member", isAdmin: false }), "forbidden");
+  assert.equal(adminRouteAccess({ isAuthenticated: true, source: "clerk", userId: "admin", isAdmin: true }), "allow");
   assert.equal(
-    adminRouteAccess({ isAuthenticated: true, userId: "org-owner", organizationRole: "owner", isAdmin: false }),
+    adminRouteAccess({ isAuthenticated: true, source: "clerk", userId: "org-owner", organizationRole: "owner", isAdmin: false }),
     "allow",
   );
-  assert.equal(adminRouteAccess({ isAuthenticated: true, email: "admin@example.com", isAdmin: false }), "forbidden");
+  assert.equal(adminRouteAccess({ isAuthenticated: true, source: "clerk", email: "admin@example.com", isAdmin: false }), "forbidden");
+  assert.equal(adminRouteAccess({ isAuthenticated: true, source: "staging_basic_auth", userId: "cad-admin", isAdmin: true }), "sign_in");
 });
 
 test("app route access requires an authenticated SaaS user", () => {
   assert.equal(appRouteAccess({ isAuthenticated: false, isAdmin: false }), "sign_in");
-  assert.equal(appRouteAccess({ isAuthenticated: true, userId: "member", isAdmin: false }), "allow");
-  assert.equal(appRouteAccess({ isAuthenticated: true, userId: "admin", isAdmin: true }), "allow");
+  assert.equal(appRouteAccess({ isAuthenticated: true, source: "clerk", userId: "member", isAdmin: false }), "allow");
+  assert.equal(appRouteAccess({ isAuthenticated: true, source: "dev_bypass", userId: "local-dev", isAdmin: false }), "allow");
+  assert.equal(appRouteAccess({ isAuthenticated: true, source: "staging_basic_auth", userId: "cad-admin", isAdmin: true }), "sign_in");
 });
 
 test("sign-in redirect path preserves internal return targets only", () => {
