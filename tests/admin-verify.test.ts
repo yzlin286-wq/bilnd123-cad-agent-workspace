@@ -74,6 +74,27 @@ test("admin:verify writes a sanitized failure report when Clerk keys are absent"
   }
 });
 
+test("admin:bootstrap loads Clerk lazily and keeps config failures sanitized", async () => {
+  const source = readFileSync(path.join(process.cwd(), "scripts/bootstrap-admin.mjs"), "utf8");
+  assert.doesNotMatch(source, /import\s+\{\s*createClerkClient\s*\}\s+from\s+["']@clerk\/backend["']/);
+  assert.match(source, /await import\(["']@clerk\/backend["']\)/);
+
+  const result = await runNode(process.execPath, ["scripts/bootstrap-admin.mjs"], {
+    cwd: process.cwd(),
+    env: {
+      ...process.env,
+      CLERK_SECRET_KEY: "",
+      ADMIN_BOOTSTRAP_EMAIL: "admin@example.com",
+      ADMIN_BOOTSTRAP_PASSWORD: "do-not-print-this-password",
+    },
+  });
+
+  assert.equal(result.code, 1);
+  assert.match(result.stderr, /BOOTSTRAP_CONFIG_ERROR/);
+  assert.equal(result.stderr.includes("do-not-print-this-password"), false);
+  assert.equal(result.stdout.includes("do-not-print-this-password"), false);
+});
+
 function runNode(command: string, args: string[], options: { cwd: string; env?: NodeJS.ProcessEnv }) {
   return new Promise<{ code: number | null; stdout: string; stderr: string }>((resolve, reject) => {
     const child = spawn(command, args, { ...options, stdio: ["ignore", "pipe", "pipe"] });

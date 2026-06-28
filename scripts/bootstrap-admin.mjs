@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 
-import { createClerkClient } from "@clerk/backend";
 import { chmod, mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
@@ -16,9 +15,9 @@ if (password.length < 12) {
   fail("ADMIN_BOOTSTRAP_PASSWORD must be at least 12 characters.");
 }
 
-const clerk = createClerkClient({ secretKey });
-
 try {
+  const { createClerkClient } = await import("@clerk/backend");
+  const clerk = createClerkClient({ secretKey });
   const existing = await clerk.users.getUserList({ emailAddress: [email], limit: 1 });
   const currentUser = existing.data?.[0];
   const metadata = { role: "admin" };

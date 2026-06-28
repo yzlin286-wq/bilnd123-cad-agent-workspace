@@ -129,7 +129,7 @@ Do not put server IPs, tester IPs, passwords, API keys, Cloudflare tokens, or ce
 
 ## Clerk Admin Bootstrap
 
-Run the bootstrap from the server with real Clerk keys in the process environment. Do not paste the password into git, README, issue trackers, or shell scripts.
+Run the bootstrap from the `cad-agent` container, or from a server shell where `npm ci` has already installed dependencies, with real Clerk keys in the process environment. Do not paste the password into git, README, issue trackers, or shell scripts.
 
 ```bash
 ADMIN_BOOTSTRAP_EMAIL=admin@example.com \

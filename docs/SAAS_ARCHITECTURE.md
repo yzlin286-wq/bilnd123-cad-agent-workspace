@@ -37,7 +37,7 @@ When Clerk is configured, Basic Auth is only an outer staging gate. It must not 
 
 When Clerk is not configured, staging can continue using Basic Auth as a temporary internal fallback. This fallback is not a production SaaS auth replacement and must be reported as incomplete SaaS login.
 
-Admin bootstrap:
+Admin bootstrap runs from the `cad-agent` container, or from a host shell after `npm ci` has installed dependencies:
 
 ```bash
 ADMIN_BOOTSTRAP_EMAIL=admin@example.com \
