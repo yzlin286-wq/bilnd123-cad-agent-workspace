@@ -90,6 +90,7 @@ test("handoff:check fails the current HTTP Basic Auth fallback posture without l
     assert.match(failedIds.join(","), /app_requires_clerk_session/);
     assert.match(failedIds.join(","), /admin_requires_clerk_session/);
     assert.match(failedIds.join(","), /admin_email_declared/);
+    assert.match(failedIds.join(","), /clerk_admin_email_matches/);
     assert.match(failedIds.join(","), /admin_password_delivery_declared/);
     assert.match(failedIds.join(","), /clerk_admin_identity_verified/);
     assert.match(failedIds.join(","), /admin_flow_evidence_verified/);
@@ -168,6 +169,7 @@ test("handoff:check fails the current HTTP Basic Auth fallback posture without l
       .map((check: { id: string }) => check.id);
     assert.equal(credentialReport.checks.find((check: { id: string }) => check.id === "ip_fallback_unauth_401")?.ok, true);
     assert.equal(credentialReport.checks.find((check: { id: string }) => check.id === "ip_fallback_health_200")?.ok, true);
+    assert.equal(credentialReport.checks.find((check: { id: string }) => check.id === "clerk_admin_email_matches")?.ok, true);
     assert.equal(credentialReport.checks.find((check: { id: string }) => check.id === "clerk_admin_identity_verified")?.ok, true);
     assert.equal(credentialReport.checks.find((check: { id: string }) => check.id === "admin_flow_evidence_verified")?.ok, true);
     assert.equal(credentialReport.checks.find((check: { id: string }) => check.id === "admin_login_verified")?.ok, true);
@@ -176,6 +178,54 @@ test("handoff:check fails the current HTTP Basic Auth fallback posture without l
     assert.equal(credentialReport.checks.find((check: { id: string }) => check.id === "artifact_cross_owner_forbidden")?.ok, true);
     assert.match(credentialFailedIds.join(","), /admin_credential_file_exists/);
     assert.match(credentialFailedIds.join(","), /admin_credential_file_private/);
+
+    writeFileSync(
+      adminVerifyPath,
+      JSON.stringify({
+        ok: true,
+        adminEmail: "other-admin@example.com",
+        userId: "user_other_admin",
+        evidence: { adminAuthorized: true },
+      }),
+      "utf8",
+    );
+    const mismatchedAdminVerifyResult = await runNode(
+      process.execPath,
+      [
+        "scripts/v12-handoff-check.mjs",
+        "--base-url",
+        `http://127.0.0.1:${port}`,
+        "--expected-ip",
+        "127.0.0.1",
+        "--ip-fallback-url",
+        `http://127.0.0.1:${port}`,
+        "--admin-email",
+        "admin@example.com",
+        "--credential-path",
+        missingCredentialPath,
+        "--admin-verify-path",
+        adminVerifyPath,
+        "--admin-flow-evidence-path",
+        adminFlowEvidencePath,
+        "--output",
+        outputPath,
+      ],
+      {
+        cwd: process.cwd(),
+        env: {
+          ...process.env,
+          STAGING_BASIC_AUTH_USER: "cad-admin",
+          STAGING_BASIC_AUTH_PASSWORD: "do-not-print-this",
+        },
+      },
+    );
+    assert.equal(mismatchedAdminVerifyResult.code, 1);
+    assert.equal(mismatchedAdminVerifyResult.stdout.includes("do-not-print-this"), false);
+    const mismatchedReport = JSON.parse(readFileSync(outputPath, "utf8"));
+    assert.equal(mismatchedReport.observed.admin.email, "admin@example.com");
+    assert.equal(mismatchedReport.observed.admin.verifiedEmail, "other-admin@example.com");
+    assert.equal(mismatchedReport.checks.find((check: { id: string }) => check.id === "clerk_admin_email_matches")?.ok, false);
+    assert.equal(mismatchedReport.checks.find((check: { id: string }) => check.id === "clerk_admin_identity_verified")?.ok, false);
   } finally {
     await new Promise<void>((resolve) => {
       server.close(() => resolve());

@@ -42,8 +42,10 @@ export type V12HandoffResult = {
       passwordDelivery: string;
       credentialPath: string;
       verifyPath: string;
+      flowEvidencePath: string;
       clerkIdentityVerified: boolean;
       clerkAdminAuthorized: boolean;
+      verifiedEmail: string;
       userId: string;
     };
     verification: {
@@ -53,6 +55,8 @@ export type V12HandoffResult = {
       adminProjectCreateVerified: boolean;
       adminPackageDownloadVerified: boolean;
       artifactAuthzVerified: boolean;
+      evidenceVerified: boolean;
+      evidenceGeneratedAt: string;
     };
   };
   summary: {

@@ -56,6 +56,11 @@ export function evaluateV12Handoff({
   const credentialRecord = record(credentialInspection);
   const adminVerificationRecord = record(adminVerification);
   const adminVerificationEvidence = record(adminVerificationRecord.evidence);
+  const declaredAdminEmail = normalizeEmail(adminEmail);
+  const verifiedAdminEmail = normalizeEmail(adminVerificationRecord.adminEmail);
+  const adminVerificationMatchesDeclaredEmail = Boolean(
+    declaredAdminEmail && verifiedAdminEmail && declaredAdminEmail === verifiedAdminEmail,
+  );
   const adminFlowEvidenceRecord = record(adminFlowEvidence);
 
   add(checks, "base_url_present", Boolean(baseUrl), "A staging base URL is required.");
@@ -116,6 +121,12 @@ export function evaluateV12Handoff({
     "With the outer staging gate satisfied but no Clerk session, /admin must redirect/block instead of returning 200.",
   );
   add(checks, "admin_email_declared", Boolean(adminEmail), "A Clerk admin email must be declared for handoff.");
+  add(
+    checks,
+    "clerk_admin_email_matches",
+    adminVerificationMatchesDeclaredEmail,
+    "The Clerk admin verification report must match the declared admin email.",
+  );
   add(checks, "admin_password_delivery_declared", Boolean(normalizedDelivery), "A one-time admin password delivery method must be declared.");
   if (normalizedDelivery === "server_file") {
     add(checks, "admin_credential_file_exists", credentialRecord.exists === true, "The server-only admin credential file must exist.");
@@ -132,7 +143,7 @@ export function evaluateV12Handoff({
   add(
     checks,
     "clerk_admin_identity_verified",
-    adminVerificationRecord.ok === true && adminVerificationEvidence.adminAuthorized === true,
+    adminVerificationRecord.ok === true && adminVerificationEvidence.adminAuthorized === true && adminVerificationMatchesDeclaredEmail,
     "The declared admin must be verified through Clerk Backend API and authorized as admin.",
   );
   add(
@@ -205,6 +216,7 @@ export function evaluateV12Handoff({
         flowEvidencePath: stringValue(adminFlowEvidencePath),
         clerkIdentityVerified: adminVerificationRecord.ok === true,
         clerkAdminAuthorized: adminVerificationEvidence.adminAuthorized === true,
+        verifiedEmail: verifiedAdminEmail,
         userId: stringValue(adminVerificationRecord.userId),
       },
       verification: {
@@ -484,6 +496,10 @@ function arrayOfStrings(value) {
 
 function stringValue(value) {
   return typeof value === "string" ? value : "";
+}
+
+function normalizeEmail(value) {
+  return typeof value === "string" ? value.trim().toLowerCase() : "";
 }
 
 function normalizePasswordDelivery(value, credentialPath) {

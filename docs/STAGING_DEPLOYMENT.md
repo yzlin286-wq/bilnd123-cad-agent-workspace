@@ -324,6 +324,7 @@ The gate verifies:
 - admin email and password delivery are declared
 - when `V12_ADMIN_PASSWORD_DELIVERY=server_file`, the credential file exists and is not readable by group/world users
 - `npm run admin:verify` confirms the declared Clerk user exists, has password login enabled, is not banned or locked, and is authorized as admin by metadata or allowlist
+- the admin verification report email must match the declared `--admin-email` / `V12_ADMIN_EMAIL`
 - `V12_ADMIN_FLOW_EVIDENCE_PATH` points to sanitized evidence that verifies the real Clerk admin can log in, reach `/admin`, create a CAD project, and download their own `package.zip`
 - the sanitized evidence verifies a non-admin Clerk user is blocked from `/admin`
 - the sanitized evidence verifies a cross-owner artifact download attempt returns `403`

@@ -99,8 +99,8 @@ function actionItems(checks) {
   if (failedIds.has("health_clerk_configured") || failedIds.has("clerk_sign_in_rendered")) {
     items.push("- Configure real Clerk keys and bootstrap a real admin user.");
   }
-  if (failedIds.has("clerk_admin_identity_verified")) {
-    items.push("- Run npm run admin:verify with real Clerk keys and pass its output to handoff:check.");
+  if (failedIds.has("clerk_admin_identity_verified") || failedIds.has("clerk_admin_email_matches")) {
+    items.push("- Run npm run admin:verify for the declared admin email and pass its matching output to handoff:check.");
   }
   if (failedIds.has("admin_flow_evidence_verified")) {
     items.push("- Capture sanitized admin flow evidence and verify it with npm run admin:flow:verify before handoff:check.");
