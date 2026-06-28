@@ -41,6 +41,10 @@ test("handoff:check fails the current HTTP Basic Auth fallback posture without l
       response.end("<h1>Clerk is not configured</h1>");
       return;
     }
+    if (request.url === "/sign-up") {
+      response.end("<h1>Clerk is not configured</h1>");
+      return;
+    }
     if (request.url === "/app" || request.url === "/admin") {
       response.end("<main>Basic Auth fallback page</main>");
       return;
@@ -89,6 +93,7 @@ test("handoff:check fails the current HTTP Basic Auth fallback posture without l
     assert.match(failedIds.join(","), /health_clerk_configured/);
     assert.match(failedIds.join(","), /expected_commit_declared/);
     assert.match(failedIds.join(","), /clerk_sign_in_rendered/);
+    assert.match(failedIds.join(","), /clerk_sign_up_rendered/);
     assert.match(failedIds.join(","), /app_requires_clerk_session/);
     assert.match(failedIds.join(","), /admin_requires_clerk_session/);
     assert.match(failedIds.join(","), /admin_email_declared/);

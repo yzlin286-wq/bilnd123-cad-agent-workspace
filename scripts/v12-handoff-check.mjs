@@ -24,6 +24,8 @@ export function evaluateV12Handoff({
   health,
   signInStatus,
   signInHtml = "",
+  signUpStatus,
+  signUpHtml = "",
   appStatus,
   appLocation,
   adminStatus,
@@ -120,6 +122,12 @@ export function evaluateV12Handoff({
     "clerk_sign_in_rendered",
     signInStatus === 200 && !signInHtml.includes("Clerk is not configured"),
     "The sign-in page must render real Clerk UI, not the placeholder.",
+  );
+  add(
+    checks,
+    "clerk_sign_up_rendered",
+    signUpStatus === 200 && !signUpHtml.includes("Clerk is not configured"),
+    "The sign-up page must render real Clerk UI, not the placeholder.",
   );
   add(
     checks,
@@ -339,6 +347,7 @@ async function probeStaging(baseUrl, authHeader) {
   const headers = authHeader ? { authorization: authHeader } : {};
   const healthResponse = await requestJson(new URL("/api/health", baseUrl), headers);
   const signInResponse = await requestText(new URL("/sign-in", baseUrl), headers);
+  const signUpResponse = await requestText(new URL("/sign-up", baseUrl), headers);
   const appResponse = await requestText(new URL("/app", baseUrl), headers, "manual");
   const adminResponse = await requestText(new URL("/admin", baseUrl), headers, "manual");
   return {
@@ -346,6 +355,8 @@ async function probeStaging(baseUrl, authHeader) {
     health: healthResponse.body,
     signInStatus: signInResponse.status,
     signInHtml: signInResponse.body,
+    signUpStatus: signUpResponse.status,
+    signUpHtml: signUpResponse.body,
     appStatus: appResponse.status,
     appLocation: appResponse.location,
     adminStatus: adminResponse.status,

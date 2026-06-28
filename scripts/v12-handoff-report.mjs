@@ -99,7 +99,7 @@ function actionItems(checks) {
   if (failedIds.has("base_url_https") || failedIds.has("health_https_configured") || failedIds.has("http_redirects_to_https")) {
     items.push("- Configure DNS, Caddy HTTPS, and HTTP to HTTPS redirect before claiming v1.2 handoff.");
   }
-  if (failedIds.has("health_clerk_configured") || failedIds.has("clerk_sign_in_rendered")) {
+  if (failedIds.has("health_clerk_configured") || failedIds.has("clerk_sign_in_rendered") || failedIds.has("clerk_sign_up_rendered")) {
     items.push("- Configure real Clerk keys and bootstrap a real admin user.");
   }
   if (failedIds.has("clerk_admin_identity_verified") || failedIds.has("clerk_admin_email_matches")) {
