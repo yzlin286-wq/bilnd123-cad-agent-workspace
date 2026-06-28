@@ -6,6 +6,7 @@ import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
+import { evaluateV12Handoff } from "../scripts/v12-handoff-check.mjs";
 
 test("handoff:check fails the current HTTP Basic Auth fallback posture without leaking credentials", async () => {
   const server = createServer((request, response) => {
@@ -200,6 +201,9 @@ test("handoff:check fails the current HTTP Basic Auth fallback posture without l
     assert.equal(credentialReport.checks.find((check: { id: string }) => check.id === "artifact_cross_owner_forbidden")?.ok, true);
     assert.match(credentialFailedIds.join(","), /admin_credential_file_exists/);
     assert.match(credentialFailedIds.join(","), /admin_credential_file_private/);
+    assert.match(credentialFailedIds.join(","), /admin_credential_email_matches/);
+    assert.match(credentialFailedIds.join(","), /admin_credential_password_present/);
+    assert.match(credentialFailedIds.join(","), /admin_credential_rotation_required/);
 
     writeFileSync(
       adminVerifyPath,
@@ -284,6 +288,67 @@ test("handoff:check fails the current HTTP Basic Auth fallback posture without l
     });
     rmSync(outputDir, { recursive: true, force: true });
   }
+});
+
+test("handoff:check validates server-file admin credential contents without storing secrets", () => {
+  const report = evaluateV12Handoff({
+    baseUrl: "https://cad-agent.example.com",
+    expectedIp: "203.0.113.10",
+    dnsResolution: { addresses: ["203.0.113.10"] },
+    httpRedirect: { status: 308, location: "https://cad-agent.example.com" },
+    healthStatus: 200,
+    health: {
+      app: "ok",
+      cadRunnerConfigured: true,
+      llmConfigured: true,
+      outputDirWritable: true,
+      httpsConfigured: true,
+      accessMode: "https",
+      auth: { clerkConfigured: true, devBypassEnabled: false },
+      dataLayer: { mode: "postgres", productionReady: true },
+      build: { commitSha: "4d7d7c3" },
+    },
+    signInStatus: 200,
+    signInHtml: "<main>Clerk sign in</main>",
+    signUpStatus: 200,
+    signUpHtml: "<main>Clerk sign up</main>",
+    appStatus: 307,
+    adminStatus: 307,
+    projectsApiStatus: 401,
+    adminEmail: "admin@example.com",
+    passwordDelivery: "server_file",
+    credentialPath: "/opt/app/admin-credential.txt",
+    credentialInspection: {
+      checked: true,
+      exists: true,
+      privatePermissions: true,
+      emailMatches: false,
+      passwordPresent: true,
+      rotationRequired: false,
+    },
+    adminVerification: {
+      ok: true,
+      adminEmail: "admin@example.com",
+      userId: "user_admin",
+      evidence: { adminAuthorized: true },
+    },
+    adminFlowEvidence: { ok: true, build: { commitSha: "4d7d7c3" } },
+    expectedCommit: "4d7d7c3",
+    adminLoginVerified: true,
+    adminPageVerified: true,
+    nonAdminBlockedVerified: true,
+    adminProjectCreateVerified: true,
+    adminPackageDownloadVerified: true,
+    artifactAuthzVerified: true,
+  });
+
+  const checks = new Map(report.checks.map((check) => [check.id, check.ok]));
+  assert.equal(checks.get("admin_credential_file_exists"), true);
+  assert.equal(checks.get("admin_credential_file_private"), true);
+  assert.equal(checks.get("admin_credential_password_present"), true);
+  assert.equal(checks.get("admin_credential_email_matches"), false);
+  assert.equal(checks.get("admin_credential_rotation_required"), false);
+  assert.equal(JSON.stringify(report).includes("password="), false);
 });
 
 function runNode(command: string, args: string[], options: { cwd: string; env?: NodeJS.ProcessEnv }) {

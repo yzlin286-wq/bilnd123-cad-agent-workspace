@@ -165,6 +165,24 @@ export function evaluateV12Handoff({
       credentialRecord.privatePermissions === true,
       "The server-only admin credential file must not allow group or world access.",
     );
+    add(
+      checks,
+      "admin_credential_email_matches",
+      credentialRecord.emailMatches === true,
+      "The server-only admin credential file must contain the declared admin email.",
+    );
+    add(
+      checks,
+      "admin_credential_password_present",
+      credentialRecord.passwordPresent === true,
+      "The server-only admin credential file must contain an initial password.",
+    );
+    add(
+      checks,
+      "admin_credential_rotation_required",
+      credentialRecord.rotationRequired === true,
+      "The server-only admin credential file must require password rotation.",
+    );
   }
   if (normalizedDelivery === "secure_channel") {
     add(checks, "admin_password_secure_channel_declared", true, "A secure one-time password channel was declared.");
@@ -311,7 +329,7 @@ async function main() {
   const dnsResolution = baseUrl ? await resolveBaseUrlHost(baseUrl) : undefined;
   const httpRedirect = baseUrl ? await probeHttpRedirect(baseUrl) : undefined;
   const ipFallbackProbe = ipFallbackUrl ? await probeIpFallback(ipFallbackUrl, authHeader) : {};
-  const credentialInspection = credentialPath ? await inspectCredentialFile(credentialPath) : undefined;
+  const credentialInspection = credentialPath ? await inspectCredentialFile(credentialPath, adminEmail) : undefined;
   const adminVerifyPath = options.adminVerifyPath || process.env.V12_ADMIN_VERIFY_PATH;
   const adminVerification = adminVerifyPath ? await readJsonIfPresent(adminVerifyPath) : undefined;
   const adminFlowEvidencePath = options.adminFlowEvidencePath || process.env.V12_ADMIN_FLOW_EVIDENCE_PATH;
@@ -478,14 +496,21 @@ async function readJsonIfPresent(filePath) {
   }
 }
 
-async function inspectCredentialFile(filePath) {
+async function inspectCredentialFile(filePath, adminEmail) {
   try {
-    const fileStat = await stat(path.resolve(filePath));
+    const absolutePath = path.resolve(filePath);
+    const fileStat = await stat(absolutePath);
     const permissions = fileStat.mode & 0o777;
+    const text = fileStat.isFile() ? await readFile(absolutePath, "utf8") : "";
+    const credential = parseCredentialFile(text);
+    const declaredEmail = normalizeEmail(adminEmail);
     return {
       checked: true,
       exists: fileStat.isFile(),
       privatePermissions: fileStat.isFile() && (permissions & 0o077) === 0,
+      emailMatches: Boolean(declaredEmail && credential.email === declaredEmail),
+      passwordPresent: credential.passwordPresent === true,
+      rotationRequired: credential.rotationRequired === true,
       mode: `0${permissions.toString(8).padStart(3, "0")}`,
     };
   } catch {
@@ -493,8 +518,25 @@ async function inspectCredentialFile(filePath) {
       checked: true,
       exists: false,
       privatePermissions: false,
+      emailMatches: false,
+      passwordPresent: false,
+      rotationRequired: false,
     };
   }
+}
+
+function parseCredentialFile(text) {
+  const parsed = { email: "", passwordPresent: false, rotationRequired: false };
+  for (const line of String(text || "").split(/\r?\n/)) {
+    const separator = line.indexOf("=");
+    if (separator < 0) continue;
+    const key = line.slice(0, separator).trim().toLowerCase();
+    const value = line.slice(separator + 1).trim();
+    if (key === "email") parsed.email = normalizeEmail(value);
+    if (key === "password") parsed.passwordPresent = Boolean(value);
+    if (key === "rotation_required") parsed.rotationRequired = value.toLowerCase() === "yes";
+  }
+  return parsed;
 }
 
 async function writeJson(filePath, data) {
