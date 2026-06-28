@@ -96,6 +96,7 @@ Run these checks after applying the allowlist and restarting the app:
 - Confirm HTTP redirects to HTTPS.
 - Confirm authenticated `/api/health` returns `httpsConfigured: true`.
 - Set `STAGING_ACCESS_MODE=https`.
+- Set `STAGING_DOMAIN` to the real domain and `STAGING_HTTPS_ENABLED=1`.
 - Confirm real Clerk sign-in works.
 - Confirm `dataLayer.mode: "postgres"` and `dataLayer.productionReady: true`.
 - Confirm unauthenticated `/app` is blocked or redirected to sign-in.

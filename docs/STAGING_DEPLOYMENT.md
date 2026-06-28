@@ -37,6 +37,8 @@ PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
 STAGING_BASIC_AUTH_USER=replace-with-staging-user
 STAGING_BASIC_AUTH_PASSWORD=replace-with-strong-staging-password
 STAGING_ACCESS_MODE=unknown
+STAGING_DOMAIN=
+STAGING_HTTPS_ENABLED=0
 
 CLERK_SECRET_KEY=replace-with-real-clerk-secret-key
 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=replace-with-real-clerk-publishable-key
@@ -81,7 +83,7 @@ For domain-based HTTPS, use `docs/HTTPS_STAGING.md` and the standalone Caddy exa
 docker compose -f docker-compose.staging.https.yml --env-file .env up -d --build
 ```
 
-Only claim `STAGING_ACCESS_MODE=https` after DNS resolves to the server, Caddy has issued a certificate, HTTP redirects to HTTPS, and authenticated `/api/health` reports `httpsConfigured: true`.
+Only claim `STAGING_ACCESS_MODE=https` after DNS resolves to the server, Caddy has issued a certificate, HTTP redirects to HTTPS, `STAGING_DOMAIN` is set, `STAGING_HTTPS_ENABLED=1`, and authenticated `/api/health` reports `httpsConfigured: true`.
 
 ## Real Model Configuration
 

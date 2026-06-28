@@ -13,7 +13,7 @@ export async function GET() {
   const outputDirWritable = await canWriteOutputDir();
   const cadRunnerConfigured = isCADRunnerConfigured();
   const llmConfigured = isLLMConfigured();
-  const httpsConfigured = Boolean(process.env.STAGING_DOMAIN?.trim());
+  const httpsConfigured = isHttpsConfigured();
   const accessMode = parseStagingAccessMode();
   const warning = healthWarning({ nodeEnv: process.env.NODE_ENV, httpsConfigured });
   const dataLayer = await getDataLayerStatus();
@@ -38,6 +38,13 @@ export function parseStagingAccessMode(value = process.env.STAGING_ACCESS_MODE) 
     return configured;
   }
   return "unknown";
+}
+
+export function isHttpsConfigured({
+  stagingDomain = process.env.STAGING_DOMAIN,
+  stagingHttpsEnabled = process.env.STAGING_HTTPS_ENABLED,
+} = {}) {
+  return Boolean(stagingDomain?.trim() && stagingHttpsEnabled === "1");
 }
 
 export function healthWarning({

@@ -29,6 +29,7 @@ Add these server-only values to the staging `.env` file:
 STAGING_DOMAIN=cad-staging.example.com
 LETSENCRYPT_EMAIL=ops@example.com
 STAGING_ACCESS_MODE=https
+STAGING_HTTPS_ENABLED=1
 ```
 
 Keep the existing server-only values:
@@ -113,7 +114,7 @@ For a v1.2 SaaS access handoff, authenticated health must include:
 }
 ```
 
-The `warning` field should be absent or `null` once HTTPS is active. Do not claim HTTPS completion while `httpsConfigured` is `false` or `accessMode` is not `https`.
+The `warning` field should be absent or `null` once HTTPS is active. Do not claim HTTPS completion while `httpsConfigured` is `false`, `accessMode` is not `https`, `STAGING_DOMAIN` is empty, or `STAGING_HTTPS_ENABLED` is not `1`.
 
 ## If You Do Not Have A Domain
 

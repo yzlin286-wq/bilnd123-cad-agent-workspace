@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { healthWarning, parseStagingAccessMode } from "../app/api/health/route";
+import { healthWarning, isHttpsConfigured, parseStagingAccessMode } from "../app/api/health/route";
 import { getDataLayerStatus } from "../lib/server/data-layer";
 
 test("parseStagingAccessMode accepts only documented access modes", () => {
@@ -19,6 +19,13 @@ test("healthWarning only warns for production without HTTPS", () => {
   );
   assert.equal(healthWarning({ nodeEnv: "production", httpsConfigured: true }), undefined);
   assert.equal(healthWarning({ nodeEnv: "development", httpsConfigured: false }), undefined);
+});
+
+test("isHttpsConfigured requires a domain and an explicit HTTPS enable flag", () => {
+  assert.equal(isHttpsConfigured({ stagingDomain: "cad.example.com", stagingHttpsEnabled: "1" }), true);
+  assert.equal(isHttpsConfigured({ stagingDomain: "cad.example.com", stagingHttpsEnabled: "0" }), false);
+  assert.equal(isHttpsConfigured({ stagingDomain: "cad.example.com", stagingHttpsEnabled: undefined }), false);
+  assert.equal(isHttpsConfigured({ stagingDomain: "", stagingHttpsEnabled: "1" }), false);
 });
 
 test("data layer reports JSON fallback when DATABASE_URL is absent", async () => {

@@ -104,6 +104,7 @@ MAX_PROMPT_CHARS=2000
 CAD_RUNNER_TIMEOUT_MS=60000
 CAD_MAX_CONCURRENT_RUNS=1
 STAGING_ACCESS_MODE=unknown
+STAGING_HTTPS_ENABLED=0
 CLERK_SECRET_KEY=
 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=
 DATABASE_URL=
@@ -193,7 +194,7 @@ Observation tools:
 - `npm run staging:report`: generate a local sanitized report at `outputs/reports/staging-report.md`
 - `npm run staging:protocol`: dry-run the 20-prompt internal trial protocol at `outputs/protocol/latest.json`
 
-`npm run staging:protocol -- --execute --output outputs/protocol/latest.json` calls the real staging service and can incur model/API cost. Use it only when the staging access path and authentication are configured. The v1.2 handoff target expects `STAGING_ACCESS_MODE=https` once a real domain and certificate are active; until then, `http_restricted` must stay firewall-restricted.
+`npm run staging:protocol -- --execute --output outputs/protocol/latest.json` calls the real staging service and can incur model/API cost. Use it only when the staging access path and authentication are configured. The v1.2 handoff target expects `STAGING_ACCESS_MODE=https`, `STAGING_DOMAIN=<real-domain>`, and `STAGING_HTTPS_ENABLED=1` once a real domain and certificate are active; until then, `http_restricted` must stay firewall-restricted.
 
 Dev fallback persistence and feedback files live in the staging log volume only when `DATABASE_URL` is absent:
 
