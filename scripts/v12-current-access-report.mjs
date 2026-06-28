@@ -44,6 +44,8 @@ export function evaluateCurrentAccessReport({
     healthRecord.cadRunnerConfigured === true &&
     healthRecord.llmConfigured === true &&
     healthRecord.outputDirWritable === true;
+  const appBlockedWithoutSaasSession = isProtectedStatus(appStatus);
+  const adminBlockedWithoutSaasSession = isProtectedStatus(adminStatus);
 
   const blockers = [];
   addBlocker(blockers, !normalizedDomainUrl || !isHttpsDomainUrl(normalizedDomainUrl), "domain_https_missing", "A real HTTPS domain is not configured.");
@@ -72,6 +74,9 @@ export function evaluateCurrentAccessReport({
       healthStatus: numberValue(healthStatus),
       adminStatus: numberValue(adminStatus),
       appStatus: numberValue(appStatus),
+      temporarySmokeAccessReady: temporaryAccessOk,
+      appBlockedWithoutSaasSession,
+      adminBlockedWithoutSaasSession,
       accessMode: stringValue(healthRecord.accessMode),
       httpsConfigured: healthRecord.httpsConfigured === true,
       warning: stringValue(healthRecord.warning),
@@ -128,7 +133,8 @@ export function renderCurrentAccessReport(report) {
     "# v1.2 Current Access Report",
     "",
     `Generated: ${stringValue(report?.generatedAt) || new Date().toISOString()}`,
-    `Temporary access: ${report?.ok === true ? "ready" : "not ready"}`,
+    `Temporary smoke/API access: ${report?.ok === true ? "ready" : "not ready"}`,
+    `Interactive SaaS access: ${handoff.ready === true ? "ready" : "requires real Clerk login and HTTPS handoff"}`,
     `Final v1.2 handoff: ${handoff.ready === true ? "ready" : "not ready"}`,
     "",
     "## Access",
@@ -146,6 +152,8 @@ export function renderCurrentAccessReport(report) {
     )}, llm ${yesNo(health.llmConfigured)}, output writable ${yesNo(health.outputDirWritable)}`,
     `- /app status with current access gate: ${numberValue(access.appStatus) || "n/a"}`,
     `- /admin status with current access gate: ${numberValue(access.adminStatus) || "n/a"}`,
+    `- /app blocked without SaaS session: ${yesNo(access.appBlockedWithoutSaasSession)}`,
+    `- /admin blocked without SaaS session: ${yesNo(access.adminBlockedWithoutSaasSession)}`,
     `- Supported templates: ${arrayOfStrings(health.supportedTemplates).join(", ") || "unknown"}`,
     `- Build commit: ${stringValue(build.deployedCommit) || "not reported"}`,
     "",
@@ -154,7 +162,7 @@ export function renderCurrentAccessReport(report) {
     `- Admin user: ${stringValue(admin.user) || "not declared"}`,
     `- Admin password: ${stringValue(admin.passwordDelivery) || "not included in report"}`,
     `- Password rotation required: ${admin.passwordRotationRequired === true ? "yes" : "not verified"}`,
-    `- Clerk SaaS admin login: ${admin.temporaryBasicAuthOnly === true ? "not configured; current admin is Basic Auth only" : "configured"}`,
+    `- Clerk SaaS admin login: ${admin.temporaryBasicAuthOnly === true ? "not configured; Basic Auth is only the outer staging gate" : "configured"}`,
     "",
     "## Auth And Data",
     "",
@@ -311,6 +319,11 @@ function isHttpsDomainUrl(value) {
 
 function addBlocker(blockers, condition, id, message) {
   if (condition) blockers.push({ id, message });
+}
+
+function isProtectedStatus(status) {
+  const code = numberValue(status);
+  return code === 401 || code === 403 || (code >= 300 && code < 400);
 }
 
 function redactSecrets(text) {

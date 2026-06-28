@@ -15,6 +15,9 @@ export type CurrentAccessReport = {
     healthStatus: number;
     adminStatus: number;
     appStatus: number;
+    temporarySmokeAccessReady: boolean;
+    appBlockedWithoutSaasSession: boolean;
+    adminBlockedWithoutSaasSession: boolean;
     accessMode: string;
     httpsConfigured: boolean;
     warning: string;

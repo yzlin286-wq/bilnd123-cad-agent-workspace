@@ -12,8 +12,8 @@ test("current access report accepts temporary HTTP Basic Auth access but rejects
     credentialPath: "/opt/bilnd123-cad-agent-workspace/admin-credential.txt",
     healthUnauthStatus: 401,
     healthStatus: 200,
-    adminStatus: 200,
-    appStatus: 200,
+    adminStatus: 307,
+    appStatus: 307,
     health: {
       app: "ok",
       cadRunnerConfigured: true,
@@ -38,15 +38,21 @@ test("current access report accepts temporary HTTP Basic Auth access but rejects
   assert.equal(report.currentAccess.basicAuthProtected, true);
   assert.equal(report.currentAccess.dataLayer.mode, "postgres");
   assert.equal(report.currentAccess.build.deployedCommit, "4d7d7c3");
+  assert.equal(report.currentAccess.temporarySmokeAccessReady, true);
+  assert.equal(report.currentAccess.appBlockedWithoutSaasSession, true);
+  assert.equal(report.currentAccess.adminBlockedWithoutSaasSession, true);
   assert.equal(report.v12Handoff.ready, false);
   assert.match(report.v12Handoff.blockers.map((blocker) => blocker.id).join(","), /domain_https_missing/);
   assert.match(report.v12Handoff.blockers.map((blocker) => blocker.id).join(","), /clerk_not_configured/);
 
   const markdown = renderCurrentAccessReport(report);
-  assert.match(markdown, /Temporary access: ready/);
+  assert.match(markdown, /Temporary smoke\/API access: ready/);
+  assert.match(markdown, /Interactive SaaS access: requires real Clerk login and HTTPS handoff/);
   assert.match(markdown, /Final v1\.2 handoff: not ready/);
   assert.match(markdown, /Build commit: 4d7d7c3/);
-  assert.match(markdown, /Clerk SaaS admin login: not configured; current admin is Basic Auth only/);
+  assert.match(markdown, /\/app blocked without SaaS session: yes/);
+  assert.match(markdown, /\/admin blocked without SaaS session: yes/);
+  assert.match(markdown, /Clerk SaaS admin login: not configured; Basic Auth is only the outer staging gate/);
 });
 
 test("current access report redacts credentials and secret-like values", () => {
