@@ -28,6 +28,7 @@ export function evaluateCurrentAccessReport({
   const healthRecord = record(health);
   const auth = record(healthRecord.auth);
   const dataLayer = record(healthRecord.dataLayer);
+  const build = record(healthRecord.build);
   const handoffRecord = record(handoff);
   const handoffSummary = record(handoffRecord.summary);
   const handoffChecks = arrayValue(handoffRecord.checks);
@@ -93,6 +94,9 @@ export function evaluateCurrentAccessReport({
         connected: dataLayer.connected === true,
         schemaReady: dataLayer.schemaReady === true,
       },
+      build: {
+        deployedCommit: normalizeCommitSha(build.commitSha),
+      },
     },
     admin: {
       user: stringValue(adminUser),
@@ -116,6 +120,7 @@ export function renderCurrentAccessReport(report) {
   const health = record(access.health);
   const auth = record(access.auth);
   const dataLayer = record(access.dataLayer);
+  const build = record(access.build);
   const admin = record(report?.admin);
   const handoff = record(report?.v12Handoff);
   const blockers = arrayValue(handoff.blockers);
@@ -142,6 +147,7 @@ export function renderCurrentAccessReport(report) {
     `- /app status with current access gate: ${numberValue(access.appStatus) || "n/a"}`,
     `- /admin status with current access gate: ${numberValue(access.adminStatus) || "n/a"}`,
     `- Supported templates: ${arrayOfStrings(health.supportedTemplates).join(", ") || "unknown"}`,
+    `- Build commit: ${stringValue(build.deployedCommit) || "not reported"}`,
     "",
     "## Admin",
     "",
@@ -334,6 +340,11 @@ function arrayOfStrings(value) {
 
 function stringValue(value) {
   return typeof value === "string" ? value : "";
+}
+
+function normalizeCommitSha(value) {
+  const normalized = typeof value === "string" ? value.trim().toLowerCase() : "";
+  return /^[0-9a-f]{7,40}$/.test(normalized) ? normalized : "";
 }
 
 function numberValue(value) {

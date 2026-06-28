@@ -32,6 +32,7 @@ test("handoff:check fails the current HTTP Basic Auth fallback posture without l
             adminAllowlistConfigured: false,
           },
           dataLayer: { mode: "postgres", productionReady: true },
+          build: { commitSha: "4d7d7c3" },
         }),
       );
       return;
@@ -86,6 +87,7 @@ test("handoff:check fails the current HTTP Basic Auth fallback posture without l
     assert.match(failedIds.join(","), /health_https_configured/);
     assert.match(failedIds.join(","), /health_access_mode_https/);
     assert.match(failedIds.join(","), /health_clerk_configured/);
+    assert.match(failedIds.join(","), /expected_commit_declared/);
     assert.match(failedIds.join(","), /clerk_sign_in_rendered/);
     assert.match(failedIds.join(","), /app_requires_clerk_session/);
     assert.match(failedIds.join(","), /admin_requires_clerk_session/);
@@ -140,6 +142,8 @@ test("handoff:check fails the current HTTP Basic Auth fallback posture without l
         `http://127.0.0.1:${port}`,
         "--expected-ip",
         "127.0.0.1",
+        "--expected-commit",
+        "4d7d7c3",
         "--ip-fallback-url",
         `http://127.0.0.1:${port}`,
         "--admin-email",
@@ -169,6 +173,11 @@ test("handoff:check fails the current HTTP Basic Auth fallback posture without l
       .map((check: { id: string }) => check.id);
     assert.equal(credentialReport.checks.find((check: { id: string }) => check.id === "ip_fallback_unauth_401")?.ok, true);
     assert.equal(credentialReport.checks.find((check: { id: string }) => check.id === "ip_fallback_health_200")?.ok, true);
+    assert.equal(credentialReport.checks.find((check: { id: string }) => check.id === "expected_commit_declared")?.ok, true);
+    assert.equal(credentialReport.checks.find((check: { id: string }) => check.id === "health_commit_reported")?.ok, true);
+    assert.equal(credentialReport.checks.find((check: { id: string }) => check.id === "health_commit_matches_expected")?.ok, true);
+    assert.equal(credentialReport.observed.build.deployedCommit, "4d7d7c3");
+    assert.equal(credentialReport.observed.build.expectedCommit, "4d7d7c3");
     assert.equal(credentialReport.checks.find((check: { id: string }) => check.id === "clerk_admin_email_matches")?.ok, true);
     assert.equal(credentialReport.checks.find((check: { id: string }) => check.id === "clerk_admin_identity_verified")?.ok, true);
     assert.equal(credentialReport.checks.find((check: { id: string }) => check.id === "admin_flow_evidence_verified")?.ok, true);
@@ -197,6 +206,8 @@ test("handoff:check fails the current HTTP Basic Auth fallback posture without l
         `http://127.0.0.1:${port}`,
         "--expected-ip",
         "127.0.0.1",
+        "--expected-commit",
+        "4d7d7c3",
         "--ip-fallback-url",
         `http://127.0.0.1:${port}`,
         "--admin-email",
@@ -226,6 +237,33 @@ test("handoff:check fails the current HTTP Basic Auth fallback posture without l
     assert.equal(mismatchedReport.observed.admin.verifiedEmail, "other-admin@example.com");
     assert.equal(mismatchedReport.checks.find((check: { id: string }) => check.id === "clerk_admin_email_matches")?.ok, false);
     assert.equal(mismatchedReport.checks.find((check: { id: string }) => check.id === "clerk_admin_identity_verified")?.ok, false);
+
+    const mismatchedCommitResult = await runNode(
+      process.execPath,
+      [
+        "scripts/v12-handoff-check.mjs",
+        "--base-url",
+        `http://127.0.0.1:${port}`,
+        "--expected-ip",
+        "127.0.0.1",
+        "--expected-commit",
+        "aaaaaaaa",
+        "--output",
+        outputPath,
+      ],
+      {
+        cwd: process.cwd(),
+        env: {
+          ...process.env,
+          STAGING_BASIC_AUTH_USER: "cad-admin",
+          STAGING_BASIC_AUTH_PASSWORD: "do-not-print-this",
+        },
+      },
+    );
+    assert.equal(mismatchedCommitResult.code, 1);
+    const mismatchedCommitReport = JSON.parse(readFileSync(outputPath, "utf8"));
+    assert.equal(mismatchedCommitReport.checks.find((check: { id: string }) => check.id === "health_commit_reported")?.ok, true);
+    assert.equal(mismatchedCommitReport.checks.find((check: { id: string }) => check.id === "health_commit_matches_expected")?.ok, false);
   } finally {
     await new Promise<void>((resolve) => {
       server.close(() => resolve());

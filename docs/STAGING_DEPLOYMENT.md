@@ -39,6 +39,7 @@ STAGING_BASIC_AUTH_PASSWORD=replace-with-strong-staging-password
 STAGING_ACCESS_MODE=unknown
 STAGING_DOMAIN=
 STAGING_HTTPS_ENABLED=0
+APP_COMMIT_SHA=
 
 CLERK_SECRET_KEY=replace-with-real-clerk-secret-key
 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=replace-with-real-clerk-publishable-key
@@ -58,6 +59,8 @@ CAD_OUTPUT_MAX_BYTES=1073741824
 Never prefix model keys with `NEXT_PUBLIC_`. Browser code must not receive `CAD_AGENT_API_KEY`.
 
 `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` is public but must be available during `next build` so the Clerk client bundle can initialize. The staging compose files pass it as a Docker build arg. After adding or rotating Clerk keys, rebuild the image with `--env-file .env up -d --build`; do not rely on a container restart alone.
+
+Set `APP_COMMIT_SHA` to the deployed commit before building, for example `APP_COMMIT_SHA=$(git rev-parse --short HEAD)`. `/api/health`, staging smoke, and v1.2 handoff reports expose only this sanitized commit value so the verified deployment can be tied back to a Git commit.
 
 ## Docker Compose
 
@@ -279,7 +282,7 @@ V12_ADMIN_PASSWORD_DELIVERY=server_file \
 V12_ADMIN_CREDENTIAL_PATH=/opt/bilnd123-cad-agent-workspace/admin-credential.txt \
 V12_ADMIN_VERIFY_PATH=outputs/reports/v12-admin-verify.json \
 V12_ADMIN_FLOW_EVIDENCE_PATH=outputs/reports/v12-admin-flow-evidence.json \
-npm run handoff:check -- --output outputs/reports/v12-handoff-check.json
+npm run handoff:check -- --expected-commit "$(git rev-parse --short HEAD)" --output outputs/reports/v12-handoff-check.json
 ```
 
 Generate the sanitized access handoff report from the check output:
@@ -319,6 +322,7 @@ The gate verifies:
 - authenticated `/api/health` reports `httpsConfigured: true`, `accessMode: "https"`, no warning, runner true, llm true, output writable true
 - health reports `auth.clerkConfigured: true` and `auth.devBypassEnabled: false`
 - health reports `dataLayer.mode: "postgres"` and `productionReady: true`
+- health reports the deployed `APP_COMMIT_SHA`, and it matches `--expected-commit`
 - `/sign-in` renders Clerk UI instead of the placeholder
 - `/app` and `/admin` do not return 200 when only the outer staging Basic Auth is satisfied and no Clerk session exists
 - admin email and password delivery are declared

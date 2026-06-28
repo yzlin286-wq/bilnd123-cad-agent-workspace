@@ -41,6 +41,10 @@ test("handoff:report renders a sanitized v1.2 handoff report", async () => {
               mode: "postgres",
               productionReady: true,
             },
+            build: {
+              deployedCommit: "4d7d7c3",
+              expectedCommit: "4d7d7c3",
+            },
             admin: {
               email: "admin@example.com",
               passwordDelivery: "server_file",
@@ -81,6 +85,7 @@ test("handoff:report renders a sanitized v1.2 handoff report", async () => {
     assert.match(markdown, /Status: not ready/);
     assert.match(markdown, /Domain: not configured/);
     assert.match(markdown, /IP fallback: http:\/\/203\.0\.113\.10:12602/);
+    assert.match(markdown, /Build commit: 4d7d7c3 \(expected 4d7d7c3\)/);
     assert.match(markdown, /Admin email: admin@example\.com/);
     assert.match(markdown, /Admin password: server-only file/);
     assert.match(markdown, /Admin flow evidence: no/);

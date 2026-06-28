@@ -14,6 +14,7 @@ export function renderV12HandoffReport(report) {
   const health = record(observed.health);
   const auth = record(observed.auth);
   const dataLayer = record(observed.dataLayer);
+  const build = record(observed.build);
   const admin = record(observed.admin);
   const verification = record(observed.verification);
   const summary = record(report?.summary);
@@ -39,6 +40,7 @@ export function renderV12HandoffReport(report) {
     )}, output writable ${yesNo(health.outputDirWritable)}`,
     `- Supported templates: ${arrayValue(health.supportedTemplates).join(", ") || "unknown"}`,
     `- Data layer: ${stringValue(dataLayer.mode) || "unknown"}, production ready ${yesNo(dataLayer.productionReady)}`,
+    `- Build commit: ${stringValue(build.deployedCommit) || "not reported"}${build.expectedCommit ? ` (expected ${stringValue(build.expectedCommit)})` : ""}`,
     "",
     "## Admin",
     "",
@@ -107,6 +109,9 @@ function actionItems(checks) {
   }
   if (failedIds.has("health_data_layer_postgres")) {
     items.push("- Configure DATABASE_URL, run migrations, and verify Postgres health.");
+  }
+  if (failedIds.has("expected_commit_declared") || failedIds.has("health_commit_reported") || failedIds.has("health_commit_matches_expected")) {
+    items.push("- Set APP_COMMIT_SHA on the deployment and rerun handoff:check with --expected-commit for the deployed commit.");
   }
   if ([...failedIds].some((id) => id.startsWith("admin_") || id.includes("artifact"))) {
     items.push("- Complete real admin login, project creation, package download, and artifact authorization verification.");

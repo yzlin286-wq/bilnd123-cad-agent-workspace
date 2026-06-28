@@ -37,6 +37,10 @@ export type V12HandoffResult = {
       projectStore: string;
       schemaReady: boolean;
     };
+    build: {
+      expectedCommit: string;
+      deployedCommit: string;
+    };
     admin: {
       email: string;
       passwordDelivery: string;

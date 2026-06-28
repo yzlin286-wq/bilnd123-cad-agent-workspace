@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { authPosture, healthWarning, isHttpsConfigured, parseStagingAccessMode } from "../app/api/health/route";
+import { authPosture, deploymentInfo, healthWarning, isHttpsConfigured, parseStagingAccessMode } from "../app/api/health/route";
 import { getDataLayerStatus } from "../lib/server/data-layer";
 
 test("parseStagingAccessMode accepts only documented access modes", () => {
@@ -51,6 +51,14 @@ test("authPosture reports safe booleans without exposing secret values", () => {
     devBypassEnabled: true,
     adminAllowlistConfigured: false,
   });
+});
+
+test("deploymentInfo exposes only sanitized commit metadata", () => {
+  assert.deepEqual(deploymentInfo({ appCommitSha: "4D7D7C3" }), { commitSha: "4d7d7c3" });
+  assert.deepEqual(deploymentInfo({ appCommitSha: "4d7d7c39240b83a54785c1efd59b907a5a4fc921" }), {
+    commitSha: "4d7d7c39240b83a54785c1efd59b907a5a4fc921",
+  });
+  assert.deepEqual(deploymentInfo({ appCommitSha: "not-a-commit; /opt/secret" }), { commitSha: "" });
 });
 
 test("data layer reports JSON fallback when DATABASE_URL is absent", async () => {

@@ -37,6 +37,9 @@ export type CurrentAccessReport = {
       connected: boolean;
       schemaReady: boolean;
     };
+    build: {
+      deployedCommit: string;
+    };
   };
   admin: {
     user: string;

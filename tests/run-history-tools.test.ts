@@ -194,7 +194,11 @@ test("staging report writes sanitized markdown without prompts", async () => {
       ok: true,
       startedAt: "2026-06-27T00:00:01.000Z",
       durationMs: 999,
-      health: { httpsConfigured: false, warning: "Staging is running without HTTPS domain; restrict access." },
+      health: {
+        httpsConfigured: false,
+        warning: "Staging is running without HTTPS domain; restrict access.",
+        build: { commitSha: "4d7d7c3" },
+      },
       rev001: { id: "rev001", validationPassed: true },
       rev002: { id: "rev002", validationPassed: true },
       artifactDownloads: [{ kind: "package" }],
@@ -242,6 +246,7 @@ test("staging report writes sanitized markdown without prompts", async () => {
   assert.equal(result.smokePresent, true);
   assert.match(markdown, /Staging Observation Report/);
   assert.match(markdown, /Unexpected failures: 1/);
+  assert.match(markdown, /Build commit: 4d7d7c3/);
   assert.match(markdown, /Rev002: rev002/);
   assert.match(markdown, /Protocol total: 1/);
   assert.match(markdown, /Protocol passed: 1/);

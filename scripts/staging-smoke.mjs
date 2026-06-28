@@ -87,6 +87,9 @@ const result = {
     httpsConfigured: health.httpsConfigured,
     accessMode: health.accessMode,
     warning: health.warning,
+    build: {
+      commitSha: sanitizeCommitSha(health.build?.commitSha),
+    },
   },
   rev001: revisionSummary(rev001),
   rev002: revisionSummary(rev002),
@@ -167,6 +170,11 @@ function lastEvent(events, type) {
 function fetchURL(pathOrUrl, init = {}) {
   const url = pathOrUrl.startsWith("http") ? pathOrUrl : `${baseUrl}${pathOrUrl}`;
   return fetch(url, { ...init, headers: { ...authHeader, ...(init.headers ?? {}) } });
+}
+
+function sanitizeCommitSha(value) {
+  const normalized = typeof value === "string" ? value.trim().toLowerCase() : "";
+  return /^[0-9a-f]{7,40}$/.test(normalized) ? normalized : "";
 }
 
 function basicAuthHeader() {

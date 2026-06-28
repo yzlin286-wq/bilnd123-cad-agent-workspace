@@ -18,6 +18,7 @@ export async function GET() {
   const warning = healthWarning({ nodeEnv: process.env.NODE_ENV, httpsConfigured });
   const dataLayer = await getDataLayerStatus();
   const auth = authPosture();
+  const build = deploymentInfo();
 
   return Response.json({
     ok: outputDirWritable,
@@ -30,6 +31,7 @@ export async function GET() {
     warning,
     auth,
     dataLayer,
+    build,
     supportedTemplates,
   });
 }
@@ -76,6 +78,17 @@ export function authPosture({
     devBypassEnabled: devBypass === "1",
     adminAllowlistConfigured: Boolean(adminUserIds?.trim() || adminEmails?.trim()),
   };
+}
+
+export function deploymentInfo({ appCommitSha = process.env.APP_COMMIT_SHA } = {}) {
+  return {
+    commitSha: normalizeCommitSha(appCommitSha),
+  };
+}
+
+function normalizeCommitSha(value?: string) {
+  const trimmed = value?.trim() || "";
+  return /^[0-9a-f]{7,40}$/i.test(trimmed) ? trimmed.toLowerCase() : "";
 }
 
 async function canWriteOutputDir() {

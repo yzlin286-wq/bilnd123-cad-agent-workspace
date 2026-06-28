@@ -25,6 +25,7 @@ test("current access report accepts temporary HTTP Basic Auth access but rejects
       supportedTemplates: ["mounting_plate", "l_bracket"],
       auth: { clerkConfigured: false, basicAuthConfigured: true, devBypassEnabled: false },
       dataLayer: { mode: "postgres", productionReady: true, connected: true, schemaReady: true },
+      build: { commitSha: "4D7D7C3" },
     },
     handoff: {
       ok: false,
@@ -36,6 +37,7 @@ test("current access report accepts temporary HTTP Basic Auth access but rejects
   assert.equal(report.ok, true);
   assert.equal(report.currentAccess.basicAuthProtected, true);
   assert.equal(report.currentAccess.dataLayer.mode, "postgres");
+  assert.equal(report.currentAccess.build.deployedCommit, "4d7d7c3");
   assert.equal(report.v12Handoff.ready, false);
   assert.match(report.v12Handoff.blockers.map((blocker) => blocker.id).join(","), /domain_https_missing/);
   assert.match(report.v12Handoff.blockers.map((blocker) => blocker.id).join(","), /clerk_not_configured/);
@@ -43,6 +45,7 @@ test("current access report accepts temporary HTTP Basic Auth access but rejects
   const markdown = renderCurrentAccessReport(report);
   assert.match(markdown, /Temporary access: ready/);
   assert.match(markdown, /Final v1\.2 handoff: not ready/);
+  assert.match(markdown, /Build commit: 4d7d7c3/);
   assert.match(markdown, /Clerk SaaS admin login: not configured; current admin is Basic Auth only/);
 });
 
@@ -63,6 +66,7 @@ test("current access report redacts credentials and secret-like values", () => {
       accessMode: "https",
       auth: { clerkConfigured: true, basicAuthConfigured: true, devBypassEnabled: false },
       dataLayer: { mode: "postgres", productionReady: true, connected: true, schemaReady: true },
+      build: { commitSha: "not-a-commit; /opt/secret" },
       leaked: "password=should-not-leak sk-test-should-not-leak",
     },
     handoff: { ok: true, summary: { passed: 32, total: 32 }, checks: [] },
@@ -71,5 +75,6 @@ test("current access report redacts credentials and secret-like values", () => {
   assert.equal(report.v12Handoff.ready, true);
   const markdown = renderCurrentAccessReport(report);
   assert.equal(markdown.includes("should-not-leak"), false);
+  assert.equal(markdown.includes("/opt/secret"), false);
   assert.match(markdown, /secure one-time channel/);
 });

@@ -36,6 +36,7 @@ export function evaluateV12Handoff({
   adminVerification,
   adminFlowEvidencePath,
   adminFlowEvidence,
+  expectedCommit,
   adminLoginVerified,
   adminPageVerified,
   nonAdminBlockedVerified,
@@ -50,8 +51,11 @@ export function evaluateV12Handoff({
   const fallbackHealthRecord = record(ipFallbackHealth);
   const dataLayer = record(healthRecord.dataLayer);
   const auth = record(healthRecord.auth);
+  const build = record(healthRecord.build);
   const dnsRecord = record(dnsResolution);
   const httpRedirectRecord = record(httpRedirect);
+  const normalizedExpectedCommit = normalizeCommitSha(expectedCommit);
+  const deployedCommit = normalizeCommitSha(build.commitSha);
   const normalizedDelivery = normalizePasswordDelivery(passwordDelivery, credentialPath);
   const credentialRecord = record(credentialInspection);
   const adminVerificationRecord = record(adminVerification);
@@ -101,6 +105,14 @@ export function evaluateV12Handoff({
     "health_data_layer_production_ready",
     dataLayer.productionReady === true,
     "Postgres data layer must report productionReady=true.",
+  );
+  add(checks, "expected_commit_declared", Boolean(normalizedExpectedCommit), "The expected deployed commit must be declared.");
+  add(checks, "health_commit_reported", Boolean(deployedCommit), "Health must report the deployed commit.");
+  add(
+    checks,
+    "health_commit_matches_expected",
+    commitsMatch(deployedCommit, normalizedExpectedCommit),
+    "Health deployed commit must match the expected handoff commit.",
   );
   add(
     checks,
@@ -208,6 +220,10 @@ export function evaluateV12Handoff({
         projectStore: stringValue(dataLayer.projectStore),
         schemaReady: dataLayer.schemaReady === true,
       },
+      build: {
+        expectedCommit: normalizedExpectedCommit,
+        deployedCommit,
+      },
       admin: {
         email: stringValue(adminEmail),
         passwordDelivery: normalizedDelivery,
@@ -264,6 +280,7 @@ async function main() {
   const baseUrl = options.baseUrl || process.env.STAGING_BASE_URL;
   const output = options.output || DEFAULT_OUTPUT;
   const expectedIp = options.expectedIp || process.env.V12_EXPECTED_IP;
+  const expectedCommit = options.expectedCommit || process.env.V12_EXPECTED_COMMIT || process.env.APP_COMMIT_SHA;
   const ipFallbackUrl = options.ipFallbackUrl || process.env.V12_IP_FALLBACK_URL;
   const adminEmail = options.adminEmail || process.env.ADMIN_BOOTSTRAP_EMAIL || process.env.V12_ADMIN_EMAIL;
   const credentialPath = options.credentialPath || process.env.ADMIN_BOOTSTRAP_CREDENTIAL_PATH || process.env.V12_ADMIN_CREDENTIAL_PATH;
@@ -293,6 +310,7 @@ async function main() {
     adminVerification,
     adminFlowEvidencePath,
     adminFlowEvidence,
+    expectedCommit,
     adminLoginVerified: adminFlowFlags.adminLoginVerified === true,
     adminPageVerified: adminFlowFlags.adminPageVerified === true,
     nonAdminBlockedVerified: adminFlowFlags.nonAdminBlockedVerified === true,
@@ -411,6 +429,7 @@ function parseArgs(args) {
     if (arg === "--base-url") options.baseUrl = args[++index];
     else if (arg === "--output") options.output = args[++index];
     else if (arg === "--expected-ip") options.expectedIp = args[++index];
+    else if (arg === "--expected-commit") options.expectedCommit = args[++index];
     else if (arg === "--ip-fallback-url") options.ipFallbackUrl = args[++index];
     else if (arg === "--admin-email") options.adminEmail = args[++index];
     else if (arg === "--credential-path") options.credentialPath = args[++index];
@@ -500,6 +519,16 @@ function stringValue(value) {
 
 function normalizeEmail(value) {
   return typeof value === "string" ? value.trim().toLowerCase() : "";
+}
+
+function normalizeCommitSha(value) {
+  const normalized = typeof value === "string" ? value.trim().toLowerCase() : "";
+  return /^[0-9a-f]{7,40}$/.test(normalized) ? normalized : "";
+}
+
+function commitsMatch(deployedCommit, expectedCommit) {
+  if (!deployedCommit || !expectedCommit) return false;
+  return deployedCommit === expectedCommit || deployedCommit.startsWith(expectedCommit) || expectedCommit.startsWith(deployedCommit);
 }
 
 function normalizePasswordDelivery(value, credentialPath) {

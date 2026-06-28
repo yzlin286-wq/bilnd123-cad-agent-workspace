@@ -38,6 +38,7 @@ SaaS access handoff status:
 - Data: `db/schema.sql` defines the Postgres schema and the runtime adapter uses Postgres when `DATABASE_URL` is configured.
 - Authorization: artifacts are checked against project/revision ownership before download.
 - HTTPS/domain: `docker-compose.staging.https.yml` and Caddy config are provided, but a real domain/DNS setup is still required before claiming HTTPS access.
+- Build evidence: set `APP_COMMIT_SHA` in the server-only `.env` before rebuilding so `/api/health`, smoke output, and handoff reports prove the deployed commit.
 
 ## No Fallback Policy
 
@@ -105,6 +106,7 @@ CAD_RUNNER_TIMEOUT_MS=60000
 CAD_MAX_CONCURRENT_RUNS=1
 STAGING_ACCESS_MODE=unknown
 STAGING_HTTPS_ENABLED=0
+APP_COMMIT_SHA=
 CLERK_SECRET_KEY=
 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=
 DATABASE_URL=
@@ -270,7 +272,7 @@ V12_ADMIN_PASSWORD_DELIVERY=server_file \
 V12_ADMIN_CREDENTIAL_PATH=/opt/bilnd123-cad-agent-workspace/admin-credential.txt \
 V12_ADMIN_VERIFY_PATH=outputs/reports/v12-admin-verify.json \
 V12_ADMIN_FLOW_EVIDENCE_PATH=outputs/reports/v12-admin-flow-evidence.json \
-npm run handoff:check -- --output outputs/reports/v12-handoff-check.json
+npm run handoff:check -- --expected-commit "$(git rev-parse --short HEAD)" --output outputs/reports/v12-handoff-check.json
 ```
 
 For the temporary HTTP + Basic Auth staging posture, generate a current-access report instead of calling the handoff complete:

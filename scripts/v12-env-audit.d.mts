@@ -14,6 +14,7 @@ export type V12EnvAuditReport = {
     clerkSecret: boolean;
     clerkPublishable: boolean;
     databaseUrl: boolean;
+    appCommitSha: boolean;
     basicAuth: boolean;
     adminEmail: boolean;
     adminCredentialPath: boolean;

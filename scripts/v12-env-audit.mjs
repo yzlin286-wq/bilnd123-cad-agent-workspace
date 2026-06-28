@@ -45,6 +45,7 @@ export function evaluateV12EnvAudit({ env = {}, envFile = ".env", envFileInfo, c
     "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY must be configured.",
   );
   add(checks, "dev_auth_bypass_disabled", !truthy(env.SAAS_DEV_AUTH_BYPASS), "SAAS_DEV_AUTH_BYPASS must not be enabled.");
+  add(checks, "app_commit_sha_configured", looksLikeCommit(env.APP_COMMIT_SHA), "APP_COMMIT_SHA must be set to the deployed git commit.");
   add(checks, "database_url_configured", usableValue(env.DATABASE_URL), "DATABASE_URL must be configured for Postgres.");
   add(checks, "database_url_not_placeholder", usableValue(env.DATABASE_URL) && !placeholder(env.DATABASE_URL), "DATABASE_URL must not be a placeholder.");
   add(checks, "basic_auth_user_configured", usableValue(env.STAGING_BASIC_AUTH_USER), "STAGING_BASIC_AUTH_USER should remain configured as the outer staging gate.");
@@ -83,6 +84,7 @@ export function evaluateV12EnvAudit({ env = {}, envFile = ".env", envFileInfo, c
       clerkSecret: usableValue(env.CLERK_SECRET_KEY),
       clerkPublishable: usableValue(env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY),
       databaseUrl: usableValue(env.DATABASE_URL),
+      appCommitSha: looksLikeCommit(env.APP_COMMIT_SHA),
       basicAuth: usableValue(env.STAGING_BASIC_AUTH_USER) && usableValue(env.STAGING_BASIC_AUTH_PASSWORD),
       adminEmail: usableValue(env.ADMIN_BOOTSTRAP_EMAIL) || usableValue(env.V12_ADMIN_EMAIL),
       adminCredentialPath: usableValue(credentialPath),
@@ -117,6 +119,7 @@ export function renderV12EnvAudit(report) {
     `- Clerk secret: ${yesNo(configured.clerkSecret)}`,
     `- Clerk publishable key: ${yesNo(configured.clerkPublishable)}`,
     `- DATABASE_URL: ${yesNo(configured.databaseUrl)}`,
+    `- APP_COMMIT_SHA: ${yesNo(configured.appCommitSha)}`,
     `- Basic Auth gate: ${yesNo(configured.basicAuth)}`,
     `- Admin email: ${yesNo(configured.adminEmail)}`,
     `- Admin credential path: ${yesNo(configured.adminCredentialPath)}`,
@@ -223,6 +226,10 @@ function unquote(value) {
 function looksLikeSecret(value, prefix) {
   const text = stringValue(value);
   return usableValue(text) && text.startsWith(prefix) && !placeholder(text);
+}
+
+function looksLikeCommit(value) {
+  return /^[0-9a-f]{7,40}$/i.test(stringValue(value).trim());
 }
 
 function usableValue(value) {

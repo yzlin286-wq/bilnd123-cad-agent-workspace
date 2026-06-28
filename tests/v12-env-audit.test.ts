@@ -25,9 +25,11 @@ ADMIN_BOOTSTRAP_CREDENTIAL_PATH=/opt/app/admin-credential.txt
   assert.match(failed, /staging_access_mode_https/);
   assert.match(failed, /staging_https_enabled/);
   assert.match(failed, /clerk_secret_configured/);
+  assert.match(failed, /app_commit_sha_configured/);
 
   const markdown = renderV12EnvAudit(report);
   assert.match(markdown, /Status: not ready/);
+  assert.match(markdown, /APP_COMMIT_SHA: no/);
   assert.equal(markdown.includes("secret-value"), false);
 });
 
@@ -44,6 +46,7 @@ STAGING_BASIC_AUTH_PASSWORD=basic-password
 ADMIN_BOOTSTRAP_EMAIL=admin@example.com
 ADMIN_BOOTSTRAP_CREDENTIAL_PATH=/opt/app/admin-credential.txt
 SAAS_DEV_AUTH_BYPASS=0
+APP_COMMIT_SHA=4d7d7c3
 `);
 
   const report = evaluateV12EnvAudit({
@@ -55,10 +58,13 @@ SAAS_DEV_AUTH_BYPASS=0
   assert.equal(report.ok, true);
   assert.equal(report.configured.clerkSecret, true);
   assert.equal(report.configured.databaseUrl, true);
+  assert.equal(report.configured.appCommitSha, true);
 
   const markdown = renderV12EnvAudit(report);
   assert.match(markdown, /Status: ready/);
   assert.match(markdown, /Clerk secret: yes/);
+  assert.match(markdown, /APP_COMMIT_SHA: yes/);
+  assert.equal(markdown.includes("4d7d7c3"), false);
   assert.equal(markdown.includes("should_not_leak"), false);
   assert.equal(markdown.includes("db-password"), false);
   assert.equal(markdown.includes("basic-password"), false);

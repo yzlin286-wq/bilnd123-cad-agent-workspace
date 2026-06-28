@@ -193,6 +193,7 @@ function smokeLines(smoke, smokeUpdatedAt, generatedAt) {
     `- HTTPS configured: ${Boolean(smoke.health?.httpsConfigured)}`,
     `- Access mode: ${smoke.health?.accessMode || "unknown"}`,
     `- Warning: ${smoke.health?.warning || "none"}`,
+    `- Build commit: ${sanitizeCommitSha(smoke.health?.build?.commitSha) || "not reported"}`,
     `- Rev001: ${smoke.rev001?.id || "missing"} | validation ${Boolean(smoke.rev001?.validationPassed)}`,
     `- Rev002: ${smoke.rev002?.id || "missing"} | validation ${Boolean(smoke.rev002?.validationPassed)}`,
     `- Artifact downloads: ${smoke.artifactDownloads?.length ?? 0}`,
@@ -311,6 +312,11 @@ function formatAge(timestamp, generatedAt) {
   if (days > 0) return `${days}d ${hours % 24}h`;
   if (hours > 0) return `${hours}h ${minutes % 60}m`;
   return `${minutes}m`;
+}
+
+function sanitizeCommitSha(value) {
+  const normalized = typeof value === "string" ? value.trim().toLowerCase() : "";
+  return /^[0-9a-f]{7,40}$/.test(normalized) ? normalized : "";
 }
 
 function parseArgs(argv) {
