@@ -1,13 +1,25 @@
 import { SignUp } from "@clerk/nextjs";
 import Link from "next/link";
-import { isClerkConfigured } from "@/lib/server/auth";
+import { isClerkConfigured, safeAuthReturnPath, signInRedirectPath } from "@/lib/server/auth";
 
-export default function SignUpPage() {
+export default async function SignUpPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ redirect_url?: string }>;
+}) {
+  const params = await searchParams;
+  const returnPath = safeAuthReturnPath(params.redirect_url);
   return (
     <main className="auth-shell">
       <section className="auth-panel">
         {isClerkConfigured() ? (
-          <SignUp routing="path" path="/sign-up" signInUrl="/sign-in" />
+          <SignUp
+            routing="path"
+            path="/sign-up"
+            signInUrl={signInRedirectPath(returnPath)}
+            forceRedirectUrl={returnPath}
+            fallbackRedirectUrl={returnPath}
+          />
         ) : (
           <AuthNotConfigured />
         )}

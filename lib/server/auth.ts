@@ -79,8 +79,14 @@ export function appRouteAccess(auth: AuthContext): "allow" | "sign_in" {
 
 export function signInRedirectPath(returnPath = "/app") {
   const params = new URLSearchParams();
-  params.set("redirect_url", safeInternalReturnPath(returnPath));
+  params.set("redirect_url", safeAuthReturnPath(returnPath));
   return `/sign-in?${params.toString()}`;
+}
+
+export function signUpRedirectPath(returnPath = "/app") {
+  const params = new URLSearchParams();
+  params.set("redirect_url", safeAuthReturnPath(returnPath));
+  return `/sign-up?${params.toString()}`;
 }
 
 export function redirectToSignIn(pathname = "/app") {
@@ -88,9 +94,21 @@ export function redirectToSignIn(pathname = "/app") {
   return NextResponse.redirect(url);
 }
 
-function safeInternalReturnPath(value: string) {
-  if (!value.startsWith("/") || value.startsWith("//")) return "/app";
-  return value;
+export function safeAuthReturnPath(value: string | null | undefined) {
+  const fallback = "/app";
+  if (!value || !value.startsWith("/") || value.startsWith("//") || value.includes("\\")) return fallback;
+  try {
+    const url = new URL(value, "http://internal.local");
+    if (url.origin !== "http://internal.local") return fallback;
+    if (!isAllowedAuthReturnPath(url.pathname)) return fallback;
+    return `${url.pathname}${url.search}${url.hash}`;
+  } catch {
+    return fallback;
+  }
+}
+
+function isAllowedAuthReturnPath(pathname: string) {
+  return pathname === "/app" || pathname.startsWith("/app/") || pathname === "/admin" || pathname.startsWith("/admin/");
 }
 
 async function clerkAuthContext(): Promise<AuthContext> {

@@ -1,5 +1,5 @@
 import { getAdminSummary } from "@/lib/server/admin-summary";
-import { adminRouteAccess, getPageAuthContext } from "@/lib/server/auth";
+import { adminRouteAccess, getPageAuthContext, signInRedirectPath } from "@/lib/server/auth";
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 
@@ -9,7 +9,7 @@ export default async function AdminPage() {
   const auth = await getPageAuthContext();
   const access = adminRouteAccess(auth);
   if (access === "sign_in") {
-    redirect("/sign-in?redirect_url=/admin");
+    redirect(signInRedirectPath("/admin"));
   }
   if (access === "forbidden") {
     redirect("/app");
