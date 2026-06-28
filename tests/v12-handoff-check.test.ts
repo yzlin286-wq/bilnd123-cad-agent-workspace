@@ -92,6 +92,7 @@ test("handoff:check fails the current HTTP Basic Auth fallback posture without l
     assert.match(failedIds.join(","), /admin_email_declared/);
     assert.match(failedIds.join(","), /admin_password_delivery_declared/);
     assert.match(failedIds.join(","), /clerk_admin_identity_verified/);
+    assert.match(failedIds.join(","), /admin_flow_evidence_verified/);
     assert.match(failedIds.join(","), /admin_login_verified/);
     assert.match(failedIds.join(","), /admin_project_create_verified/);
     assert.match(failedIds.join(","), /admin_package_download_verified/);
@@ -102,6 +103,7 @@ test("handoff:check fails the current HTTP Basic Auth fallback posture without l
 
     const missingCredentialPath = path.join(outputDir, "missing-admin-credential.txt");
     const adminVerifyPath = path.join(outputDir, "admin-verify.json");
+    const adminFlowEvidencePath = path.join(outputDir, "admin-flow-evidence.json");
     writeFileSync(
       adminVerifyPath,
       JSON.stringify({
@@ -109,6 +111,23 @@ test("handoff:check fails the current HTTP Basic Auth fallback posture without l
         adminEmail: "admin@example.com",
         userId: "user_admin",
         evidence: { adminAuthorized: true },
+      }),
+      "utf8",
+    );
+    writeFileSync(
+      adminFlowEvidencePath,
+      JSON.stringify({
+        generatedAt: "2026-06-28T12:00:00.000Z",
+        baseUrl: `http://127.0.0.1:${port}`,
+        adminEmail: "admin@example.com",
+        checks: [
+          { id: "admin_login", ok: true, status: 200 },
+          { id: "admin_page_access", ok: true, status: 200 },
+          { id: "non_admin_admin_blocked", ok: true, status: 302, location: "/app" },
+          { id: "admin_project_create", ok: true, status: 201, projectId: "project_123" },
+          { id: "admin_package_download", ok: true, status: 200, artifactName: "package.zip", bytes: 2048 },
+          { id: "artifact_cross_owner_forbidden", ok: true, status: 403 },
+        ],
       }),
       "utf8",
     );
@@ -128,6 +147,8 @@ test("handoff:check fails the current HTTP Basic Auth fallback posture without l
         missingCredentialPath,
         "--admin-verify-path",
         adminVerifyPath,
+        "--admin-flow-evidence-path",
+        adminFlowEvidencePath,
         "--output",
         outputPath,
       ],
@@ -148,6 +169,11 @@ test("handoff:check fails the current HTTP Basic Auth fallback posture without l
     assert.equal(credentialReport.checks.find((check: { id: string }) => check.id === "ip_fallback_unauth_401")?.ok, true);
     assert.equal(credentialReport.checks.find((check: { id: string }) => check.id === "ip_fallback_health_200")?.ok, true);
     assert.equal(credentialReport.checks.find((check: { id: string }) => check.id === "clerk_admin_identity_verified")?.ok, true);
+    assert.equal(credentialReport.checks.find((check: { id: string }) => check.id === "admin_flow_evidence_verified")?.ok, true);
+    assert.equal(credentialReport.checks.find((check: { id: string }) => check.id === "admin_login_verified")?.ok, true);
+    assert.equal(credentialReport.checks.find((check: { id: string }) => check.id === "admin_project_create_verified")?.ok, true);
+    assert.equal(credentialReport.checks.find((check: { id: string }) => check.id === "admin_package_download_verified")?.ok, true);
+    assert.equal(credentialReport.checks.find((check: { id: string }) => check.id === "artifact_cross_owner_forbidden")?.ok, true);
     assert.match(credentialFailedIds.join(","), /admin_credential_file_exists/);
     assert.match(credentialFailedIds.join(","), /admin_credential_file_private/);
   } finally {

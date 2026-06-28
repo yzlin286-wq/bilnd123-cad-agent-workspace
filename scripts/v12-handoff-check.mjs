@@ -6,6 +6,7 @@ import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import { isIP } from "node:net";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { evaluateAdminFlowEvidence } from "./v12-admin-flow-evidence.mjs";
 
 const DEFAULT_OUTPUT = "outputs/reports/v12-handoff-check.json";
 const REQUEST_TIMEOUT_MS = 15_000;
@@ -33,6 +34,8 @@ export function evaluateV12Handoff({
   credentialInspection,
   adminVerifyPath,
   adminVerification,
+  adminFlowEvidencePath,
+  adminFlowEvidence,
   adminLoginVerified,
   adminPageVerified,
   nonAdminBlockedVerified,
@@ -53,6 +56,7 @@ export function evaluateV12Handoff({
   const credentialRecord = record(credentialInspection);
   const adminVerificationRecord = record(adminVerification);
   const adminVerificationEvidence = record(adminVerificationRecord.evidence);
+  const adminFlowEvidenceRecord = record(adminFlowEvidence);
 
   add(checks, "base_url_present", Boolean(baseUrl), "A staging base URL is required.");
   add(checks, "base_url_https", isHttpsUrl(baseUrl), "The v1.2 handoff URL must use HTTPS.");
@@ -131,6 +135,12 @@ export function evaluateV12Handoff({
     adminVerificationRecord.ok === true && adminVerificationEvidence.adminAuthorized === true,
     "The declared admin must be verified through Clerk Backend API and authorized as admin.",
   );
+  add(
+    checks,
+    "admin_flow_evidence_verified",
+    adminFlowEvidenceRecord.ok === true,
+    "A sanitized admin flow evidence report must verify the real admin login and artifact flow.",
+  );
   add(checks, "admin_login_verified", adminLoginVerified === true, "A real Clerk admin login must be verified.");
   add(checks, "admin_page_verified", adminPageVerified === true, "The logged-in admin must be verified to access /admin.");
   add(checks, "non_admin_admin_blocked", nonAdminBlockedVerified === true, "A non-admin Clerk user must be blocked from /admin.");
@@ -192,6 +202,7 @@ export function evaluateV12Handoff({
         passwordDelivery: normalizedDelivery,
         credentialPath: normalizedDelivery === "server_file" ? stringValue(credentialPath) : "",
         verifyPath: stringValue(adminVerifyPath),
+        flowEvidencePath: stringValue(adminFlowEvidencePath),
         clerkIdentityVerified: adminVerificationRecord.ok === true,
         clerkAdminAuthorized: adminVerificationEvidence.adminAuthorized === true,
         userId: stringValue(adminVerificationRecord.userId),
@@ -203,6 +214,8 @@ export function evaluateV12Handoff({
         adminProjectCreateVerified: adminProjectCreateVerified === true,
         adminPackageDownloadVerified: adminPackageDownloadVerified === true,
         artifactAuthzVerified: artifactAuthzVerified === true,
+        evidenceVerified: adminFlowEvidenceRecord.ok === true,
+        evidenceGeneratedAt: stringValue(adminFlowEvidenceRecord.evidenceGeneratedAt),
       },
     },
     summary: {
@@ -252,6 +265,11 @@ async function main() {
   const credentialInspection = credentialPath ? await inspectCredentialFile(credentialPath) : undefined;
   const adminVerifyPath = options.adminVerifyPath || process.env.V12_ADMIN_VERIFY_PATH;
   const adminVerification = adminVerifyPath ? await readJsonIfPresent(adminVerifyPath) : undefined;
+  const adminFlowEvidencePath = options.adminFlowEvidencePath || process.env.V12_ADMIN_FLOW_EVIDENCE_PATH;
+  const adminFlowEvidence = adminFlowEvidencePath
+    ? evaluateAdminFlowEvidence(await readJsonIfPresent(adminFlowEvidencePath), { expectedBaseUrl: baseUrl, expectedAdminEmail: adminEmail })
+    : undefined;
+  const adminFlowFlags = record(adminFlowEvidence?.flags);
   const result = evaluateV12Handoff({
     baseUrl,
     expectedIp,
@@ -261,12 +279,14 @@ async function main() {
     passwordDelivery,
     adminVerifyPath,
     adminVerification,
-    adminLoginVerified: options.adminLoginVerified || envFlag("V12_ADMIN_LOGIN_VERIFIED"),
-    adminPageVerified: options.adminPageVerified || envFlag("V12_ADMIN_PAGE_VERIFIED"),
-    nonAdminBlockedVerified: options.nonAdminBlockedVerified || envFlag("V12_NON_ADMIN_BLOCKED_VERIFIED"),
-    adminProjectCreateVerified: options.adminProjectCreateVerified || envFlag("V12_ADMIN_PROJECT_CREATE_VERIFIED"),
-    adminPackageDownloadVerified: options.adminPackageDownloadVerified || envFlag("V12_ADMIN_PACKAGE_DOWNLOAD_VERIFIED"),
-    artifactAuthzVerified: options.artifactAuthzVerified || envFlag("V12_ARTIFACT_AUTHZ_VERIFIED"),
+    adminFlowEvidencePath,
+    adminFlowEvidence,
+    adminLoginVerified: adminFlowFlags.adminLoginVerified === true,
+    adminPageVerified: adminFlowFlags.adminPageVerified === true,
+    nonAdminBlockedVerified: adminFlowFlags.nonAdminBlockedVerified === true,
+    adminProjectCreateVerified: adminFlowFlags.adminProjectCreateVerified === true,
+    adminPackageDownloadVerified: adminFlowFlags.adminPackageDownloadVerified === true,
+    artifactAuthzVerified: adminFlowFlags.artifactAuthzVerified === true,
     dnsResolution,
     httpRedirect,
     ...ipFallbackProbe,
@@ -384,12 +404,7 @@ function parseArgs(args) {
     else if (arg === "--credential-path") options.credentialPath = args[++index];
     else if (arg === "--password-delivery") options.passwordDelivery = args[++index];
     else if (arg === "--admin-verify-path") options.adminVerifyPath = args[++index];
-    else if (arg === "--admin-login-verified") options.adminLoginVerified = true;
-    else if (arg === "--admin-page-verified") options.adminPageVerified = true;
-    else if (arg === "--non-admin-blocked-verified") options.nonAdminBlockedVerified = true;
-    else if (arg === "--admin-project-create-verified") options.adminProjectCreateVerified = true;
-    else if (arg === "--admin-package-download-verified") options.adminPackageDownloadVerified = true;
-    else if (arg === "--artifact-authz-verified") options.artifactAuthzVerified = true;
+    else if (arg === "--admin-flow-evidence-path") options.adminFlowEvidencePath = args[++index];
   }
   return options;
 }
@@ -469,11 +484,6 @@ function arrayOfStrings(value) {
 
 function stringValue(value) {
   return typeof value === "string" ? value : "";
-}
-
-function envFlag(name) {
-  const value = process.env[name]?.trim().toLowerCase();
-  return value === "1" || value === "true" || value === "yes";
 }
 
 function normalizePasswordDelivery(value, credentialPath) {

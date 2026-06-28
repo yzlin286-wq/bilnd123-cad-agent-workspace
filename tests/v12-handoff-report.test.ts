@@ -45,6 +45,7 @@ test("handoff:report renders a sanitized v1.2 handoff report", async () => {
               email: "admin@example.com",
               passwordDelivery: "server_file",
               credentialPath: "/opt/bilnd123-cad-agent-workspace/admin-credential.txt",
+              flowEvidencePath: "outputs/reports/v12-admin-flow-evidence.json",
             },
             verification: {
               adminLoginVerified: false,
@@ -53,12 +54,14 @@ test("handoff:report renders a sanitized v1.2 handoff report", async () => {
               adminProjectCreateVerified: false,
               adminPackageDownloadVerified: false,
               artifactAuthzVerified: false,
+              evidenceVerified: false,
             },
           },
           summary: { total: 4, passed: 1, failed: 3 },
           checks: [
             { id: "base_url_https", ok: false, message: "The v1.2 handoff URL must use HTTPS." },
             { id: "health_clerk_configured", ok: false, message: "password=super-secret sk-test-secret must not leak." },
+            { id: "admin_flow_evidence_verified", ok: false, message: "Admin flow evidence is required." },
             { id: "admin_login_verified", ok: false, message: "A real Clerk admin login must be verified." },
             { id: "health_data_layer_postgres", ok: true, message: "Staging must use Postgres." },
           ],
@@ -80,8 +83,10 @@ test("handoff:report renders a sanitized v1.2 handoff report", async () => {
     assert.match(markdown, /IP fallback: http:\/\/203\.0\.113\.10:12602/);
     assert.match(markdown, /Admin email: admin@example\.com/);
     assert.match(markdown, /Admin password: server-only file/);
+    assert.match(markdown, /Admin flow evidence: no/);
     assert.match(markdown, /Configure DNS, Caddy HTTPS/);
     assert.match(markdown, /Configure real Clerk keys/);
+    assert.match(markdown, /Capture sanitized admin flow evidence/);
     assert.equal(markdown.includes("super-secret"), false);
     assert.equal(markdown.includes("sk-test-secret"), false);
     assert.match(markdown, /password=\[redacted\]/);

@@ -226,6 +226,30 @@ docker compose -f docker-compose.staging.yml exec cad-agent \
   cat /app/logs/v12-admin-verify.json > outputs/reports/v12-admin-verify.json
 ```
 
+After real Clerk login testing, capture sanitized admin flow evidence. Do not include cookies, Basic Auth headers, passwords, API keys, full prompts, provider raw errors, tracebacks, or server paths.
+
+```json
+{
+  "generatedAt": "2026-06-28T12:00:00.000Z",
+  "baseUrl": "https://cad-agent.example.com",
+  "adminEmail": "admin@example.com",
+  "checks": [
+    { "id": "admin_login", "ok": true, "status": 200 },
+    { "id": "admin_page_access", "ok": true, "status": 200 },
+    { "id": "non_admin_admin_blocked", "ok": true, "status": 403 },
+    { "id": "admin_project_create", "ok": true, "status": 201, "projectId": "..." },
+    { "id": "admin_package_download", "ok": true, "status": 200, "artifactName": "package.zip", "bytes": 2048 },
+    { "id": "artifact_cross_owner_forbidden", "ok": true, "status": 403 }
+  ]
+}
+```
+
+Verify that evidence before handoff:
+
+```bash
+npm run admin:flow:verify -- --input outputs/reports/v12-admin-flow-evidence.json --output outputs/reports/v12-admin-flow-verify.json
+```
+
 Then run the strict handoff gate:
 
 ```bash
@@ -238,12 +262,7 @@ V12_ADMIN_EMAIL=admin@example.com \
 V12_ADMIN_PASSWORD_DELIVERY=server_file \
 V12_ADMIN_CREDENTIAL_PATH=/opt/bilnd123-cad-agent-workspace/admin-credential.txt \
 V12_ADMIN_VERIFY_PATH=outputs/reports/v12-admin-verify.json \
-V12_ADMIN_LOGIN_VERIFIED=1 \
-V12_ADMIN_PAGE_VERIFIED=1 \
-V12_NON_ADMIN_BLOCKED_VERIFIED=1 \
-V12_ADMIN_PROJECT_CREATE_VERIFIED=1 \
-V12_ADMIN_PACKAGE_DOWNLOAD_VERIFIED=1 \
-V12_ARTIFACT_AUTHZ_VERIFIED=1 \
+V12_ADMIN_FLOW_EVIDENCE_PATH=outputs/reports/v12-admin-flow-evidence.json \
 npm run handoff:check -- --output outputs/reports/v12-handoff-check.json
 ```
 
@@ -268,9 +287,9 @@ The gate verifies:
 - admin email and password delivery are declared
 - when `V12_ADMIN_PASSWORD_DELIVERY=server_file`, the credential file exists and is not readable by group/world users
 - `npm run admin:verify` confirms the declared Clerk user exists, has password login enabled, is not banned or locked, and is authorized as admin by metadata or allowlist
-- the real Clerk admin can log in, reach `/admin`, create a CAD project, and download their own `package.zip`
-- a non-admin Clerk user is blocked from `/admin`
-- a cross-owner artifact download attempt returns `403`
+- `V12_ADMIN_FLOW_EVIDENCE_PATH` points to sanitized evidence that verifies the real Clerk admin can log in, reach `/admin`, create a CAD project, and download their own `package.zip`
+- the sanitized evidence verifies a non-admin Clerk user is blocked from `/admin`
+- the sanitized evidence verifies a cross-owner artifact download attempt returns `403`
 
 This command intentionally fails against the temporary HTTP + Basic Auth staging posture. Use `smoke:staging` for temporary HTTP smoke checks; use `handoff:check` only for the final v1.2 SaaS access handoff claim. Run it on the staging host when the admin password is delivered through a server-only file; use `V12_ADMIN_PASSWORD_DELIVERY=secure_channel` only when the initial password is delivered out of band.
 

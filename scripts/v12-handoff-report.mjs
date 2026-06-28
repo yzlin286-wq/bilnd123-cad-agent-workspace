@@ -48,6 +48,7 @@ export function renderV12HandoffReport(report) {
     `- Clerk configured: ${yesNo(auth.clerkConfigured)}`,
     `- Clerk admin identity verified: ${yesNo(admin.clerkIdentityVerified)}`,
     `- Clerk admin authorized: ${yesNo(admin.clerkAdminAuthorized)}`,
+    `- Admin flow evidence: ${yesNo(verification.evidenceVerified)}${admin.flowEvidencePath ? ` (${stringValue(admin.flowEvidencePath)})` : ""}`,
     `- Dev auth bypass disabled: ${auth.devBypassEnabled === false ? "yes" : "no"}`,
     `- /admin verified: ${yesNo(verification.adminPageVerified)}`,
     "",
@@ -100,6 +101,9 @@ function actionItems(checks) {
   }
   if (failedIds.has("clerk_admin_identity_verified")) {
     items.push("- Run npm run admin:verify with real Clerk keys and pass its output to handoff:check.");
+  }
+  if (failedIds.has("admin_flow_evidence_verified")) {
+    items.push("- Capture sanitized admin flow evidence and verify it with npm run admin:flow:verify before handoff:check.");
   }
   if (failedIds.has("health_data_layer_postgres")) {
     items.push("- Configure DATABASE_URL, run migrations, and verify Postgres health.");

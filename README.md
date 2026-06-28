@@ -137,6 +137,7 @@ npm test
 npm run build
 npm run db:migrate
 npm run admin:bootstrap
+npm run admin:flow:verify
 npm run cleanup:cad
 npm run runs:classify
 npm run runs:summary
@@ -197,6 +198,7 @@ Observation tools:
 - `npm run staging:report`: generate a local sanitized report at `outputs/reports/staging-report.md`
 - `npm run staging:protocol`: dry-run the 20-prompt internal trial protocol at `outputs/protocol/latest.json`
 - `npm run admin:verify`: verify the declared Clerk admin exists, has password login, and is authorized as admin
+- `npm run admin:flow:verify`: verify sanitized evidence for admin login, `/admin`, project create, package download, and cross-owner artifact denial
 - `npm run handoff:check`: strict v1.2 SaaS access handoff gate for HTTPS, Clerk, Postgres, and admin credential delivery
 - `npm run handoff:report`: render a sanitized v1.2 handoff report from `outputs/reports/v12-handoff-check.json`
 
@@ -220,6 +222,28 @@ docker compose -f docker-compose.staging.yml exec cad-agent \
   npm run admin:verify -- --output /app/logs/v12-admin-verify.json
 ```
 
+Capture a sanitized admin flow evidence file after the real Clerk admin signs in. The evidence must not include cookies, Basic Auth headers, passwords, API keys, full prompts, traceback text, or provider raw errors.
+
+```json
+{
+  "generatedAt": "2026-06-28T12:00:00.000Z",
+  "baseUrl": "https://cad-agent.example.com",
+  "adminEmail": "admin@example.com",
+  "checks": [
+    { "id": "admin_login", "ok": true, "status": 200 },
+    { "id": "admin_page_access", "ok": true, "status": 200 },
+    { "id": "non_admin_admin_blocked", "ok": true, "status": 403 },
+    { "id": "admin_project_create", "ok": true, "status": 201, "projectId": "..." },
+    { "id": "admin_package_download", "ok": true, "status": 200, "artifactName": "package.zip", "bytes": 2048 },
+    { "id": "artifact_cross_owner_forbidden", "ok": true, "status": 403 }
+  ]
+}
+```
+
+```bash
+npm run admin:flow:verify -- --input outputs/reports/v12-admin-flow-evidence.json --output outputs/reports/v12-admin-flow-verify.json
+```
+
 Run the v1.2 handoff gate only when a real HTTPS domain and Clerk keys are configured:
 
 ```bash
@@ -232,12 +256,7 @@ V12_ADMIN_EMAIL=admin@example.com \
 V12_ADMIN_PASSWORD_DELIVERY=server_file \
 V12_ADMIN_CREDENTIAL_PATH=/opt/bilnd123-cad-agent-workspace/admin-credential.txt \
 V12_ADMIN_VERIFY_PATH=outputs/reports/v12-admin-verify.json \
-V12_ADMIN_LOGIN_VERIFIED=1 \
-V12_ADMIN_PAGE_VERIFIED=1 \
-V12_NON_ADMIN_BLOCKED_VERIFIED=1 \
-V12_ADMIN_PROJECT_CREATE_VERIFIED=1 \
-V12_ADMIN_PACKAGE_DOWNLOAD_VERIFIED=1 \
-V12_ARTIFACT_AUTHZ_VERIFIED=1 \
+V12_ADMIN_FLOW_EVIDENCE_PATH=outputs/reports/v12-admin-flow-evidence.json \
 npm run handoff:check -- --output outputs/reports/v12-handoff-check.json
 ```
 
