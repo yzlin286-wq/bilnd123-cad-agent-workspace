@@ -4,7 +4,7 @@ AI CAD Agent workspace built with Next.js, React, Three.js, and build123d.
 
 The product surface is intentionally user-facing: users start with natural language, then watch an agent workstream create an engineering spec, run the CAD kernel, validate geometry, and expose real artifacts for preview and download.
 
-Current stage: `v1.1 SaaS foundation + product UI polish`.
+Current stage: `v1.2 SaaS access handoff`.
 
 ## Product Shape
 
@@ -17,9 +17,10 @@ Current stage: `v1.1 SaaS foundation + product UI polish`.
 - Upload sketch: visible as `Coming soon`, disabled until image-to-CAD is implemented
 - Recent projects, messages, revisions, and artifact metadata persist locally for alpha trials
 - Trial feedback captures thumbs up/down and optional comments without user accounts
-- `/admin` provides a Basic Auth-protected alpha usage dashboard
+- `/admin` provides an admin-only alpha usage dashboard
 - `/app` provides a protected SaaS dashboard with template cards, recent projects, recent artifacts, usage, and alpha health
-- Clerk is the preferred SaaS auth provider; the JSON project store remains a dev fallback until Postgres is provisioned
+- Clerk is the preferred SaaS auth provider; Basic Auth is only a staging access gate when Clerk is configured
+- Postgres is the staging SaaS data layer when `DATABASE_URL` is set; JSON remains a dev fallback
 
 Not currently supported:
 
@@ -30,11 +31,13 @@ Not currently supported:
 - Public anonymous production traffic
 - Payment, tenancy, BOM, or RFQ flows
 
-SaaS foundation status:
+SaaS access handoff status:
 
-- Auth: Clerk scaffold is implemented, with staging Basic Auth fallback when Clerk keys are not configured.
-- Data: `db/schema.sql` defines the target Postgres schema; `logs/projects.json` remains the local/staging fallback until `DATABASE_URL` and an adapter are provisioned.
+- Auth: Clerk scaffold is implemented. When Clerk keys are configured, Basic Auth no longer acts as a SaaS identity.
+- Admin bootstrap: `npm run admin:bootstrap` creates or updates a Clerk admin user without printing the password.
+- Data: `db/schema.sql` defines the Postgres schema and the runtime adapter uses Postgres when `DATABASE_URL` is configured.
 - Authorization: artifacts are checked against project/revision ownership before download.
+- HTTPS/domain: `docker-compose.staging.https.yml` and Caddy config are provided, but a real domain/DNS setup is still required before claiming HTTPS access.
 
 ## No Fallback Policy
 
@@ -104,6 +107,7 @@ STAGING_ACCESS_MODE=unknown
 CLERK_SECRET_KEY=
 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=
 DATABASE_URL=
+POSTGRES_PASSWORD=
 SAAS_ADMIN_USER_IDS=
 SAAS_ADMIN_EMAILS=
 CAD_OUTPUT_RETENTION_HOURS=72
@@ -128,6 +132,8 @@ npm run lint
 npm run typecheck
 npm test
 npm run build
+npm run db:migrate
+npm run admin:bootstrap
 npm run cleanup:cad
 npm run runs:classify
 npm run runs:summary
@@ -148,7 +154,7 @@ http://127.0.0.1:3000
 ## Main APIs
 
 - `GET /api/health`: safe health summary for staging
-- `GET /admin`: Basic Auth-protected alpha usage dashboard
+- `GET /admin`: admin-only alpha usage dashboard
 - `GET /app`: signed-in SaaS dashboard
 - `GET /app/projects`: signed-in recent projects list
 - `GET /api/projects`: recent saved project summaries
@@ -177,7 +183,7 @@ Legacy diagnostic endpoints may remain for development, but the user-facing app 
 - HTTPS compose example: `docker-compose.staging.https.yml`
 - Manual smoke: `npm run smoke:staging -- --output outputs/smoke/latest.json`
 
-Staging must be protected with Basic Auth and is not suitable for public anonymous traffic. Basic Auth should not be used long-term over plaintext HTTP; use HTTPS, a private tunnel, Tailscale, or IP allowlist before broader internal testing.
+Staging must be protected and is not suitable for public anonymous traffic. Basic Auth may remain as an outer staging gate, but Clerk is the SaaS identity layer once configured. Basic Auth should not be used long-term over plaintext HTTP; use HTTPS, a private tunnel, Tailscale, or IP allowlist before broader internal testing.
 
 Observation tools:
 
@@ -187,11 +193,11 @@ Observation tools:
 - `npm run staging:report`: generate a local sanitized report at `outputs/reports/staging-report.md`
 - `npm run staging:protocol`: dry-run the 20-prompt internal trial protocol at `outputs/protocol/latest.json`
 
-`npm run staging:protocol -- --execute --output outputs/protocol/latest.json` calls the real staging service and can incur model/API cost. Use it only when the staging access path and Basic Auth are configured. The v1.1 controlled trial path expects `STAGING_ACCESS_MODE=http_restricted` after the staging port is restricted by an IP allowlist, unless the deployment is upgraded to `private_network_or_tunnel` or `https`.
+`npm run staging:protocol -- --execute --output outputs/protocol/latest.json` calls the real staging service and can incur model/API cost. Use it only when the staging access path and authentication are configured. The v1.2 handoff target expects `STAGING_ACCESS_MODE=https` once a real domain and certificate are active; until then, `http_restricted` must stay firewall-restricted.
 
-Alpha persistence and feedback files live in the staging log volume:
+Dev fallback persistence and feedback files live in the staging log volume only when `DATABASE_URL` is absent:
 
 - `logs/projects.json`: saved projects, messages, revisions, and artifact metadata
 - `logs/feedback.jsonl`: sanitized thumbs up/down feedback entries
 
-These files must not contain model API keys, Basic Auth passwords, provider raw responses, cookies, or private server paths.
+Postgres staging uses the `postgres_data` volume and stores projects, messages, revisions, artifact metadata, feedback, and usage events. Neither store may contain model API keys, Basic Auth passwords, provider raw responses, cookies, or private server paths.

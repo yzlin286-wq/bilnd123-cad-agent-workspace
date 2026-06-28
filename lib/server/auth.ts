@@ -1,4 +1,4 @@
-import { auth as clerkAuth } from "@clerk/nextjs/server";
+import { auth as clerkAuth, clerkClient } from "@clerk/nextjs/server";
 import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 import type { StoredProject } from "@/lib/project/types";
@@ -24,16 +24,14 @@ export function isClerkConfigured() {
 
 export async function getRequestAuthContext(request: Request): Promise<AuthContext> {
   if (isClerkConfigured()) {
-    const context = await clerkAuthContext();
-    if (context.isAuthenticated) return context;
+    return clerkAuthContext();
   }
   return fallbackAuthContext(request.headers.get("authorization"));
 }
 
 export async function getPageAuthContext(): Promise<AuthContext> {
   if (isClerkConfigured()) {
-    const context = await clerkAuthContext();
-    if (context.isAuthenticated) return context;
+    return clerkAuthContext();
   }
   const headerList = await headers();
   return fallbackAuthContext(headerList.get("authorization"));
@@ -80,8 +78,9 @@ async function clerkAuthContext(): Promise<AuthContext> {
   try {
     const session = await clerkAuth();
     const claims = (session.sessionClaims || {}) as Record<string, unknown>;
-    const email = stringClaim(claims.email) || stringClaim(claims.primary_email_address);
-    const context: AuthContext = {
+    const clerkProfile = session.userId ? await loadClerkProfile(session.userId) : undefined;
+    const email = stringClaim(claims.email) || stringClaim(claims.primary_email_address) || clerkProfile?.email;
+    const baseContext: AuthContext = {
       isAuthenticated: Boolean(session.userId),
       source: "clerk",
       userId: session.userId || undefined,
@@ -90,10 +89,29 @@ async function clerkAuthContext(): Promise<AuthContext> {
       email,
       isAdmin: false,
     };
-    return { ...context, isAdmin: isAdminUser(context) };
+    return { ...baseContext, isAdmin: isAdminUser(baseContext) || clerkProfile?.role === "admin" };
   } catch {
     return { isAuthenticated: false, isAdmin: false };
   }
+}
+
+async function loadClerkProfile(userId: string) {
+  try {
+    const client = await clerkClient();
+    const user = await client.users.getUser(userId);
+    return {
+      email: user.primaryEmailAddress?.emailAddress,
+      role: metadataRole(user.publicMetadata) || metadataRole(user.privateMetadata),
+    };
+  } catch {
+    return undefined;
+  }
+}
+
+function metadataRole(metadata: unknown) {
+  if (!metadata || typeof metadata !== "object") return undefined;
+  const role = (metadata as Record<string, unknown>).role;
+  return typeof role === "string" ? role : undefined;
 }
 
 function fallbackAuthContext(header: string | null): AuthContext {

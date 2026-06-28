@@ -3,7 +3,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import test from "node:test";
 import { CAD_OUTPUT_ROOT, artifactIdFromPath } from "../lib/cad/artifacts";
-import { canAccessProject } from "../lib/server/auth";
+import { canAccessProject, getRequestAuthContext } from "../lib/server/auth";
 import { GET as getArtifact } from "../app/api/artifacts/[id]/route";
 
 const PROJECT_STORE_PATH = path.resolve(process.cwd(), "logs", "projects.json");
@@ -27,6 +27,7 @@ test("artifact download requires auth and project ownership", async () => {
     "SAAS_DEV_USER_ID",
     "SAAS_DEV_ORG_ID",
     "SAAS_DEV_ADMIN",
+    "DATABASE_URL",
   ]);
   const previousStore = await readIfExists(PROJECT_STORE_PATH);
   const runDir = path.join(CAD_OUTPUT_ROOT, `authz-test-${Date.now()}`);
@@ -67,6 +68,31 @@ test("artifact download requires auth and project ownership", async () => {
       await fs.writeFile(PROJECT_STORE_PATH, previousStore, "utf8");
     }
     await fs.rm(runDir, { recursive: true, force: true });
+  }
+});
+
+test("Basic Auth is not a SaaS identity once Clerk is configured", async () => {
+  const envSnapshot = snapshotEnv([
+    "CLERK_SECRET_KEY",
+    "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY",
+    "STAGING_BASIC_AUTH_USER",
+    "STAGING_BASIC_AUTH_PASSWORD",
+    "SAAS_DEV_AUTH_BYPASS",
+  ]);
+  try {
+    process.env.CLERK_SECRET_KEY = "sk_test_fake";
+    process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY = "pk_test_fake";
+    process.env.STAGING_BASIC_AUTH_USER = "cad";
+    process.env.STAGING_BASIC_AUTH_PASSWORD = "secret";
+    delete process.env.SAAS_DEV_AUTH_BYPASS;
+
+    const header = `Basic ${Buffer.from("cad:secret").toString("base64")}`;
+    const auth = await getRequestAuthContext(new Request("http://test/app/projects", { headers: { authorization: header } }));
+
+    assert.equal(auth.isAuthenticated, false);
+    assert.equal(auth.source, undefined);
+  } finally {
+    restoreEnv(envSnapshot);
   }
 });
 
@@ -154,6 +180,7 @@ function clearAuthEnv() {
     "SAAS_DEV_USER_ID",
     "SAAS_DEV_ORG_ID",
     "SAAS_DEV_ADMIN",
+    "DATABASE_URL",
   ]) {
     delete process.env[name];
   }

@@ -9,6 +9,8 @@ import {
   createProject,
   getProject,
   listProjects,
+  PROJECT_STORE_PATH,
+  shouldUsePostgresStore,
 } from "../lib/server/project-store";
 import type { CADRevision } from "../lib/agent/spec";
 
@@ -80,6 +82,21 @@ test("project list filters by owner or organization", async () => {
   assert.equal(adminProjects.length, 2);
 
   await fs.rm(tempRoot, { recursive: true, force: true });
+});
+
+test("project store uses Postgres only for the default store path when DATABASE_URL is configured", () => {
+  const previousDatabaseUrl = process.env.DATABASE_URL;
+  try {
+    process.env.DATABASE_URL = "postgres://user:password@localhost:5432/cad_agent";
+    assert.equal(shouldUsePostgresStore(PROJECT_STORE_PATH), true);
+    assert.equal(shouldUsePostgresStore(path.join(os.tmpdir(), "projects.json")), false);
+  } finally {
+    if (previousDatabaseUrl === undefined) {
+      delete process.env.DATABASE_URL;
+    } else {
+      process.env.DATABASE_URL = previousDatabaseUrl;
+    }
+  }
 });
 
 function fakeRevision(id: string): CADRevision {

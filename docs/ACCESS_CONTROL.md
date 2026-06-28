@@ -4,9 +4,9 @@ This staging app is for short internal trials only. Current HTTP staging must be
 
 Do not commit real IP addresses, tester CIDRs, passwords, API keys, tunnel tokens, certificates, or private keys.
 
-## v1.0-alpha Selected Trial Scheme
+## v1.2 Handoff Target
 
-For the controlled v1.0-alpha internal trial, continue using the IP allowlist approach for the staging app port unless the deployment is upgraded to a private tunnel or HTTPS. This keeps the current HTTP + Basic Auth deployment path, avoids occupying ports `80` and `443`, and reduces exposure while there is no formal staging domain.
+For v1.2, the preferred handoff is a real HTTPS domain with Clerk login and Postgres persistence. The earlier IP allowlist approach remains acceptable only as an interim restricted fallback until DNS and certificate issuance are complete.
 
 Store the real allowlist only in the cloud firewall, host firewall, or server-only operations notes. Do not commit real tester IPs or CIDRs.
 
@@ -21,7 +21,7 @@ STAGING_ACCESS_MODE=http_restricted
 - App-level Basic Auth must stay enabled for staging.
 - `/api/artifacts/[id]` is protected by the same Basic Auth proxy as `/api/health`, `/api/agent/run`, `/api/agent/revise`, and `/api/cad/rebuild`.
 - `/admin`, `/api/projects`, and `/api/feedback` are protected by the same Basic Auth proxy.
-- When Clerk keys are configured, `/app/*` and `/admin` also require Clerk auth.
+- When Clerk keys are configured, `/app/*` and `/admin` require Clerk auth. Basic Auth alone is not a signed-in user.
 - `/admin` requires admin allowlist or organization admin status after sign-in.
 - Artifact downloads check project/revision ownership after auth; Basic Auth alone is not the artifact authorization model.
 - Plain HTTP plus Basic Auth is acceptable only for a short operator smoke on a restricted network path.
@@ -96,3 +96,7 @@ Run these checks after applying the allowlist and restarting the app:
 - Confirm HTTP redirects to HTTPS.
 - Confirm authenticated `/api/health` returns `httpsConfigured: true`.
 - Set `STAGING_ACCESS_MODE=https`.
+- Confirm real Clerk sign-in works.
+- Confirm `dataLayer.mode: "postgres"` and `dataLayer.productionReady: true`.
+- Confirm unauthenticated `/app` is blocked or redirected to sign-in.
+- Confirm non-admin signed-in users cannot access `/admin`.

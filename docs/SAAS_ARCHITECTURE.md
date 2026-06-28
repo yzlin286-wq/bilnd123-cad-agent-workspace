@@ -1,6 +1,6 @@
 # SaaS Architecture
 
-Current stage: `v1.1 SaaS foundation + product UI polish`.
+Current stage: `v1.2 SaaS access handoff`.
 
 ## Scope
 
@@ -33,13 +33,40 @@ SAAS_ADMIN_EMAILS=
 
 When Clerk is configured, `/app` and `/admin` are protected by Clerk middleware. `/admin` also checks an admin allowlist or organization admin role.
 
-When Clerk is not configured, staging can continue using Basic Auth as a temporary internal fallback. This fallback is not a production SaaS auth replacement.
+When Clerk is configured, Basic Auth is only an outer staging gate. It must not be treated as the SaaS identity for `/app`, `/admin`, or artifact authorization.
+
+When Clerk is not configured, staging can continue using Basic Auth as a temporary internal fallback. This fallback is not a production SaaS auth replacement and must be reported as incomplete SaaS login.
+
+Admin bootstrap:
+
+```bash
+ADMIN_BOOTSTRAP_EMAIL=admin@example.com \
+ADMIN_BOOTSTRAP_PASSWORD=one-time-password \
+ADMIN_BOOTSTRAP_CREDENTIAL_PATH=/opt/bilnd123-cad-agent-workspace/admin-credential.txt \
+ADMIN_BOOTSTRAP_ENV_FILE=/opt/bilnd123-cad-agent-workspace/.env \
+npm run admin:bootstrap
+```
+
+The bootstrap script creates or updates a Clerk user, sets admin metadata, optionally merges the email into `SAAS_ADMIN_EMAILS`, and can write the one-time password to a chmod `600` server-only file. It never prints the password.
 
 ## Data
 
-`db/schema.sql` defines the target Postgres schema. Until `DATABASE_URL` and a Postgres adapter are provisioned, `logs/projects.json` remains the dev fallback store.
+`db/schema.sql` defines the Postgres schema. When `DATABASE_URL` is configured, the runtime repository stores projects, messages, revisions, artifacts, feedback, and usage events in Postgres.
 
-The fallback store is acceptable for local development and short staging continuity checks. It is not a durable SaaS production data layer.
+The JSON fallback store is acceptable for local development and short staging continuity checks only. It is not a durable SaaS production data layer.
+
+Staging compose includes an internal Postgres service and runs `npm run db:migrate` before starting the app. A managed Postgres can be used by setting `DATABASE_URL` and `DATABASE_SSL=1` when required.
+
+## Access Handoff
+
+The v1.2 handoff is only complete when all of these are true:
+
+- A real domain resolves to the staging host.
+- Caddy or an equivalent reverse proxy terminates HTTPS and redirects HTTP to HTTPS.
+- `/api/health` returns `httpsConfigured: true`, `accessMode: "https"`, and no HTTP warning.
+- Real Clerk keys are configured.
+- An admin Clerk user has been bootstrapped and verified.
+- `dataLayer.mode` is `postgres` and `productionReady` is `true`.
 
 ## Runtime Boundaries
 

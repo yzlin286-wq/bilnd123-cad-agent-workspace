@@ -5,13 +5,15 @@
 - `/app/*`: requires a signed-in Clerk user when Clerk is configured.
 - `/admin`: requires a signed-in Clerk user and admin status.
 - Staging may also use Basic Auth as an outer access gate.
+- When Clerk is configured, Basic Auth is not a SaaS user identity. It only lets the request reach the app.
 
 Admin status can come from:
 
 - Clerk organization role: `admin`, `org:admin`, or `owner`
 - `SAAS_ADMIN_USER_IDS`
 - `SAAS_ADMIN_EMAILS`
-- Temporary staging Basic Auth fallback user
+- Clerk user metadata `role=admin`, set by `npm run admin:bootstrap`
+- Temporary staging Basic Auth fallback user only when Clerk is not configured
 
 ## Project Ownership
 
@@ -42,4 +44,4 @@ The route must never expose local server paths.
 
 ## Current Caveat
 
-When Clerk and Postgres are not configured, staging uses Basic Auth plus the JSON fallback store. This is a bridge for controlled internal testing, not a complete production SaaS authorization model.
+When Clerk and Postgres are not configured, staging uses Basic Auth plus the JSON fallback store. This is a bridge for controlled internal testing, not a complete production SaaS authorization model. A v1.2 access handoff must verify real Clerk login, non-admin `/admin` denial, project ownership, and artifact `401`/`403` behavior.

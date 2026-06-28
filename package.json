@@ -6,6 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "cleanup:cad": "node scripts/cleanup-cad-outputs.mjs",
+    "admin:bootstrap": "node scripts/bootstrap-admin.mjs",
+    "db:migrate": "node scripts/migrate-postgres.mjs",
     "failures:export": "node scripts/export-failures.mjs",
     "start": "next start",
     "lint": "eslint .",
@@ -19,6 +21,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@clerk/backend": "^3.8.4",
     "@clerk/nextjs": "^7.5.9",
     "@monaco-editor/react": "^4.7.0",
     "@react-three/drei": "^10.7.7",
@@ -26,12 +29,14 @@
     "@xyflow/react": "^12.11.1",
     "lucide-react": "^1.21.0",
     "next": "^16.2.9",
+    "pg": "^8.22.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "three": "^0.185.0"
   },
   "devDependencies": {
     "@types/node": "^26.0.1",
+    "@types/pg": "^8.20.0",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "eslint": "^9.39.4",

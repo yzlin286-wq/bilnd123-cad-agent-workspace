@@ -20,7 +20,35 @@ The target SaaS data model lives in `db/schema.sql`.
 
 ## Current Implementation
 
-The app has a repository-shaped JSON fallback in `logs/projects.json` for local development and current HTTP-restricted staging continuity. It stores:
+The app has a Postgres adapter that is active whenever `DATABASE_URL` is configured. It stores:
+
+- users and organizations observed from the auth context
+- project owner and organization attribution
+- messages
+- revisions
+- artifact metadata
+- feedback
+- usage events
+
+Run migrations before starting staging:
+
+```bash
+npm run db:migrate
+```
+
+`/api/health` reports:
+
+```json
+{
+  "dataLayer": {
+    "mode": "postgres",
+    "projectStore": "postgres",
+    "productionReady": true
+  }
+}
+```
+
+The app also has a repository-shaped JSON fallback in `logs/projects.json` for local development and emergency staging continuity when `DATABASE_URL` is absent. It stores:
 
 - project owner user id
 - organization id
@@ -28,7 +56,7 @@ The app has a repository-shaped JSON fallback in `logs/projects.json` for local 
 - revisions
 - artifact metadata
 
-Postgres is not active unless `DATABASE_URL` is provisioned and the adapter is wired. Do not claim production SaaS persistence until that happens.
+Do not claim production SaaS persistence unless `DATABASE_URL` is configured, migrations have run, and `/api/health` reports `dataLayer.productionReady: true`.
 
 ## Secret Policy
 

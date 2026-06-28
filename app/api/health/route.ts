@@ -1,6 +1,7 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { CAD_OUTPUT_ROOT } from "@/lib/cad/artifacts";
+import { getDataLayerStatus } from "@/lib/server/data-layer";
 import { isCADRunnerConfigured, isLLMConfigured } from "@/lib/server/runtime";
 
 export const runtime = "nodejs";
@@ -15,6 +16,7 @@ export async function GET() {
   const httpsConfigured = Boolean(process.env.STAGING_DOMAIN?.trim());
   const accessMode = parseStagingAccessMode();
   const warning = healthWarning({ nodeEnv: process.env.NODE_ENV, httpsConfigured });
+  const dataLayer = await getDataLayerStatus();
 
   return Response.json({
     ok: outputDirWritable,
@@ -25,6 +27,7 @@ export async function GET() {
     httpsConfigured,
     accessMode,
     warning,
+    dataLayer,
     supportedTemplates,
   });
 }

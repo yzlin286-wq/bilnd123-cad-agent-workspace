@@ -41,12 +41,13 @@ type RunRecord = {
 type JSONRecord = Record<string, unknown>;
 
 export async function getAdminSummary() {
-  const [runs, smoke, protocol, feedback, projects] = await Promise.all([
+  const [runs, smoke, protocol, feedback, projects, dataLayer] = await Promise.all([
     readJSONL<RunRecord>(RUN_LOG_PATH),
     readJSONIfExists(SMOKE_PATH),
     readJSONIfExists(PROTOCOL_PATH),
     summarizeFeedback(),
     listProjects({ limit: 10_000 }),
+    getDataLayerStatus(),
   ]);
   const durations = runs.map((run) => Number(run.durationMs)).filter((duration) => Number.isFinite(duration));
   const failures = runs.filter((run) => run.status === "failure" || run.validationPassed === false);
@@ -84,7 +85,7 @@ export async function getAdminSummary() {
       : undefined,
     newUnexpectedFailures,
     feedback,
-    dataLayer: getDataLayerStatus(),
+    dataLayer,
   };
 }
 

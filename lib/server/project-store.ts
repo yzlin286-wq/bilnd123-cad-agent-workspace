@@ -4,6 +4,17 @@ import path from "node:path";
 import type { CADRevision } from "@/lib/agent/spec";
 import type { AuthContext } from "@/lib/server/auth";
 import type { RunHistoryRoute } from "@/lib/server/run-history";
+import { isPostgresConfigured } from "@/lib/server/postgres";
+import {
+  appendProjectMessagePostgres,
+  appendProjectRevisionPostgres,
+  createProjectPostgres,
+  findArtifactOwnershipPostgres,
+  findProjectByRevisionIdPostgres,
+  getProjectPostgres,
+  listProjectsPostgres,
+  recentArtifactsPostgres,
+} from "@/lib/server/postgres-project-store";
 import { sanitizeStoredText, titleFromPrompt } from "@/lib/server/sanitize";
 import type { ArtifactOwnership, StoredMessage, StoredProject, StoredProjectSummary, StoredRevision } from "@/lib/project/types";
 
@@ -25,6 +36,9 @@ export async function listProjects({
   auth?: AuthContext;
   storePath?: string;
 } = {}) {
+  if (shouldUsePostgresStore(storePath)) {
+    return listProjectsPostgres({ limit, auth });
+  }
   const store = await readStore(storePath);
   return [...store.projects]
     .filter((project) => canReadStoredProject(auth, project))
@@ -34,6 +48,9 @@ export async function listProjects({
 }
 
 export async function getProject(projectId: string, storePath = PROJECT_STORE_PATH) {
+  if (shouldUsePostgresStore(storePath)) {
+    return getProjectPostgres(projectId);
+  }
   const store = await readStore(storePath);
   return store.projects.find((project) => project.id === projectId);
 }
@@ -53,6 +70,9 @@ export async function createProject({
   auth: AuthContext;
   storePath?: string;
 }) {
+  if (shouldUsePostgresStore(storePath)) {
+    return createProjectPostgres({ prompt, auth });
+  }
   return mutateStore(storePath, (store) => {
     const now = new Date().toISOString();
     const project: StoredProject = {
@@ -87,6 +107,9 @@ export async function appendProjectMessage({
   errorCode?: string;
   storePath?: string;
 }) {
+  if (shouldUsePostgresStore(storePath)) {
+    return appendProjectMessagePostgres({ projectId, role, content, route, revisionId, errorCode });
+  }
   if (!projectId) return undefined;
   return mutateProject(projectId, storePath, (project) => {
     const message: StoredMessage = {
@@ -115,6 +138,9 @@ export async function appendProjectRevision({
   route?: RunHistoryRoute;
   storePath?: string;
 }) {
+  if (shouldUsePostgresStore(storePath)) {
+    return appendProjectRevisionPostgres({ projectId, revision, route });
+  }
   if (!projectId) return undefined;
   return mutateProject(projectId, storePath, (project) => {
     const storedRevision = toStoredRevision(revision);
@@ -174,6 +200,9 @@ export function projectSummary(project: StoredProject): StoredProjectSummary {
 }
 
 export async function findArtifactOwnership(artifactId: string, storePath = PROJECT_STORE_PATH): Promise<ArtifactOwnership | undefined> {
+  if (shouldUsePostgresStore(storePath)) {
+    return findArtifactOwnershipPostgres(artifactId);
+  }
   const store = await readStore(storePath);
   for (const project of store.projects) {
     for (const revision of project.revisions) {
@@ -194,6 +223,9 @@ export async function findArtifactOwnership(artifactId: string, storePath = PROJ
 }
 
 export async function findProjectByRevisionId(revisionId: string, storePath = PROJECT_STORE_PATH) {
+  if (shouldUsePostgresStore(storePath)) {
+    return findProjectByRevisionIdPostgres(revisionId);
+  }
   const store = await readStore(storePath);
   return store.projects.find((project) => project.revisions.some((revision) => revision.id === revisionId));
 }
@@ -207,6 +239,9 @@ export async function recentArtifacts({
   limit?: number;
   storePath?: string;
 } = {}) {
+  if (shouldUsePostgresStore(storePath)) {
+    return recentArtifactsPostgres({ auth, limit });
+  }
   const store = await readStore(storePath);
   return store.projects
     .filter((project) => canReadStoredProject(auth, project))
@@ -224,6 +259,10 @@ export async function recentArtifacts({
     )
     .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))
     .slice(0, limit);
+}
+
+export function shouldUsePostgresStore(storePath = PROJECT_STORE_PATH) {
+  return storePath === PROJECT_STORE_PATH && isPostgresConfigured();
 }
 
 async function mutateProject<T>(projectId: string, storePath: string, mutator: (project: StoredProject) => T) {

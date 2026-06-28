@@ -1,18 +1,26 @@
+import { checkPostgresHealth, isPostgresConfigured } from "@/lib/server/postgres";
+
 export type DataLayerStatus = {
-  mode: "postgres_ready" | "dev_json_fallback";
+  mode: "postgres" | "dev_json_fallback";
   projectStore: string;
   migrationPath: string;
   productionReady: boolean;
+  connected?: boolean;
+  schemaReady?: boolean;
   todo?: string;
 };
 
-export function getDataLayerStatus(): DataLayerStatus {
-  if (process.env.DATABASE_URL?.trim()) {
+export async function getDataLayerStatus(): Promise<DataLayerStatus> {
+  if (isPostgresConfigured()) {
+    const health = await checkPostgresHealth();
     return {
-      mode: "postgres_ready",
+      mode: "postgres",
       projectStore: "postgres",
       migrationPath: "db/schema.sql",
-      productionReady: true,
+      productionReady: health.connected && health.schemaReady,
+      connected: health.connected,
+      schemaReady: health.schemaReady,
+      todo: health.connected && health.schemaReady ? undefined : "Run npm run db:migrate and verify DATABASE_URL.",
     };
   }
   return {

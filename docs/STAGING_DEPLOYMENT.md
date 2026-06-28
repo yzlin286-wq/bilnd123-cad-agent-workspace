@@ -38,6 +38,16 @@ STAGING_BASIC_AUTH_USER=replace-with-staging-user
 STAGING_BASIC_AUTH_PASSWORD=replace-with-strong-staging-password
 STAGING_ACCESS_MODE=unknown
 
+CLERK_SECRET_KEY=replace-with-real-clerk-secret-key
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=replace-with-real-clerk-publishable-key
+SAAS_ADMIN_EMAILS=admin@example.com
+
+POSTGRES_USER=cad_agent
+POSTGRES_PASSWORD=replace-with-strong-postgres-password
+POSTGRES_DB=cad_agent
+DATABASE_URL=postgres://cad_agent:replace-with-strong-postgres-password@postgres:5432/cad_agent
+DATABASE_SSL=0
+
 MAX_PROMPT_CHARS=2000
 CAD_OUTPUT_RETENTION_HOURS=72
 CAD_OUTPUT_MAX_BYTES=1073741824
@@ -57,12 +67,21 @@ Persistent data:
 
 - `cad_outputs` volume -> `/app/outputs/cad`
 - `run_logs` volume -> `/app/logs`
+- `postgres_data` volume -> Postgres project/revision/artifact/feedback/usage metadata
+
+The compose file runs `npm run db:migrate` before `npm run start`. You can also run migrations manually:
+
+```bash
+docker compose -f docker-compose.staging.yml --env-file .env exec cad-agent npm run db:migrate
+```
 
 For domain-based HTTPS, use `docs/HTTPS_STAGING.md` and the standalone Caddy example:
 
 ```bash
 docker compose -f docker-compose.staging.https.yml --env-file .env up -d --build
 ```
+
+Only claim `STAGING_ACCESS_MODE=https` after DNS resolves to the server, Caddy has issued a certificate, HTTP redirects to HTTPS, and authenticated `/api/health` reports `httpsConfigured: true`.
 
 ## Real Model Configuration
 
@@ -91,6 +110,8 @@ STAGING_BASIC_AUTH_PASSWORD=...
 
 When both are set, the staging access gate protects the app and APIs. Unauthenticated requests return `401`.
 
+When Clerk is configured, Basic Auth is only an outer staging gate. It does not create a SaaS user session. `/app`, `/admin`, project APIs, and artifact downloads still require a Clerk-authenticated user.
+
 Do not run Basic Auth over long-lived plaintext HTTP. Use HTTPS before inviting internal testers beyond a brief private smoke check.
 
 `/api/health` includes a safe `accessMode` field. Set it explicitly in the server-only `.env`:
@@ -101,6 +122,39 @@ Do not run Basic Auth over long-lived plaintext HTTP. Use HTTPS before inviting 
 - `unknown`: default when no operator has documented the access control posture.
 
 Do not put server IPs, tester IPs, passwords, API keys, Cloudflare tokens, or certificate material into committed files.
+
+## Clerk Admin Bootstrap
+
+Run the bootstrap from the server with real Clerk keys in the process environment. Do not paste the password into git, README, issue trackers, or shell scripts.
+
+```bash
+ADMIN_BOOTSTRAP_EMAIL=admin@example.com \
+ADMIN_BOOTSTRAP_PASSWORD=replace-with-one-time-password \
+ADMIN_BOOTSTRAP_FIRST_NAME=CAD \
+ADMIN_BOOTSTRAP_LAST_NAME=Admin \
+ADMIN_BOOTSTRAP_CREDENTIAL_PATH=/opt/bilnd123-cad-agent-workspace/admin-credential.txt \
+ADMIN_BOOTSTRAP_ENV_FILE=/opt/bilnd123-cad-agent-workspace/.env \
+npm run admin:bootstrap
+```
+
+The script:
+
+- creates or updates a Clerk user
+- sets Clerk public/private metadata `role=admin`
+- optionally merges the email into `SAAS_ADMIN_EMAILS`
+- optionally writes the one-time password to a chmod `600` server-only file
+- never prints the password
+
+After bootstrapping, restart the app so changed `.env` values are loaded.
+
+Required verification:
+
+- unauthenticated `/app` is redirected to sign-in or blocked
+- admin user can sign in and open `/app`
+- admin user can open `/admin`
+- a non-admin signed-in user cannot open `/admin`
+- admin user can create a CAD project and download `package.zip`
+- another signed-in user cannot download that artifact and receives `403`
 
 ## HTTP Exposure Reduction
 

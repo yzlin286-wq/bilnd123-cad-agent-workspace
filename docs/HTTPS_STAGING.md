@@ -28,6 +28,7 @@ Add these server-only values to the staging `.env` file:
 ```bash
 STAGING_DOMAIN=cad-staging.example.com
 LETSENCRYPT_EMAIL=ops@example.com
+STAGING_ACCESS_MODE=https
 ```
 
 Keep the existing server-only values:
@@ -38,6 +39,9 @@ CAD_AGENT_API_KEY=replace-with-real-server-side-key
 CAD_AGENT_PRIMARY_MODEL=primary-real-model
 STAGING_BASIC_AUTH_USER=replace-with-staging-user
 STAGING_BASIC_AUTH_PASSWORD=replace-with-strong-staging-password
+CLERK_SECRET_KEY=replace-with-real-clerk-secret-key
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=replace-with-real-clerk-publishable-key
+DATABASE_URL=postgres://cad_agent:replace-with-strong-postgres-password@postgres:5432/cad_agent
 ```
 
 ## Caddy Compose
@@ -91,6 +95,25 @@ curl -u "$STAGING_BASIC_AUTH_USER:$STAGING_BASIC_AUTH_PASSWORD" https://cad-stag
 ```
 
 The first command should redirect to HTTPS. The second command should return the health JSON without exposing secrets.
+
+For a v1.2 SaaS access handoff, authenticated health must include:
+
+```json
+{
+  "app": "ok",
+  "httpsConfigured": true,
+  "accessMode": "https",
+  "cadRunnerConfigured": true,
+  "llmConfigured": true,
+  "outputDirWritable": true,
+  "dataLayer": {
+    "mode": "postgres",
+    "productionReady": true
+  }
+}
+```
+
+The `warning` field should be absent or `null` once HTTPS is active. Do not claim HTTPS completion while `httpsConfigured` is `false` or `accessMode` is not `https`.
 
 ## If You Do Not Have A Domain
 

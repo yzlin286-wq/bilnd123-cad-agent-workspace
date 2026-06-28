@@ -67,7 +67,7 @@ export default async function AppDashboardPage() {
                 <Link href={`/app/workspace?projectId=${encodeURIComponent(project.id)}`} key={project.id}>
                   <strong>{project.title}</strong>
                   <span>
-                    {project.partType || "CAD"} · {project.revisionCount} revision{project.revisionCount === 1 ? "" : "s"}
+                    {project.partType || "CAD"} - {project.revisionCount} revision{project.revisionCount === 1 ? "" : "s"}
                   </span>
                 </Link>
               ))}
@@ -101,7 +101,7 @@ export default async function AppDashboardPage() {
             <Metric label="Failures" value={summary.failureCount} />
           </div>
           <p className="panel-note">
-            Data layer: {summary.dataLayer.mode === "postgres_ready" ? "Postgres" : "JSON dev fallback"}
+            Data layer: {summary.dataLayer.mode === "postgres" ? "Postgres" : "JSON dev fallback"}
           </p>
         </Panel>
 

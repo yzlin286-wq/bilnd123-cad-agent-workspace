@@ -1,4 +1,19 @@
 services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-cad_agent}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-cad_agent}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-cad_agent} -d ${POSTGRES_DB:-cad_agent}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   cad-agent:
     build:
       context: .
@@ -8,8 +23,12 @@ services:
         APT_SECURITY_MIRROR: ${APT_SECURITY_MIRROR:-http://mirrors.tencent.com/debian-security}
         PIP_INDEX_URL: ${PIP_INDEX_URL:-https://pypi.tuna.tsinghua.edu.cn/simple}
     restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
     ports:
       - "12601:3000"
+    command: sh -c "npm run db:migrate && npm run start"
     environment:
       NODE_ENV: production
       CAD_AGENT_BASE_URL: ${CAD_AGENT_BASE_URL:?set CAD_AGENT_BASE_URL}
@@ -30,7 +49,8 @@ services:
       NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:-}
       SAAS_ADMIN_USER_IDS: ${SAAS_ADMIN_USER_IDS:-}
       SAAS_ADMIN_EMAILS: ${SAAS_ADMIN_EMAILS:-}
-      DATABASE_URL: ${DATABASE_URL:-}
+      DATABASE_URL: ${DATABASE_URL:-postgres://cad_agent:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@postgres:5432/cad_agent}
+      DATABASE_SSL: ${DATABASE_SSL:-0}
       SAAS_DEV_AUTH_BYPASS: ${SAAS_DEV_AUTH_BYPASS:-0}
       SAAS_DEV_USER_ID: ${SAAS_DEV_USER_ID:-internal-staging-user}
       SAAS_DEV_ORG_ID: ${SAAS_DEV_ORG_ID:-internal-staging}
@@ -47,3 +67,4 @@ services:
 volumes:
   cad_outputs:
   run_logs:
+  postgres_data:
