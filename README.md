@@ -236,7 +236,7 @@ docker compose -f docker-compose.staging.yml exec cad-agent \
 
 Capture a sanitized admin flow evidence file after the real Clerk admin signs in. The evidence must not include cookies, Basic Auth headers, passwords, API keys, full prompts, traceback text, or provider raw errors.
 
-Use the same `projectId` from `admin_project_create` in the `admin_package_download` check so the package download proves the admin can download the project they just created.
+Use the same `projectId` from `admin_project_create` in the `admin_package_download` check so the package download proves the admin can download the project they just created. For `artifact_cross_owner_forbidden`, include `targetProjectId` for a different project that owns the target `package.zip`; it must not match the project created in this admin flow.
 
 ```json
 {
@@ -250,7 +250,7 @@ Use the same `projectId` from `admin_project_create` in the `admin_package_downl
     { "id": "non_admin_admin_blocked", "ok": true, "status": 403 },
     { "id": "admin_project_create", "ok": true, "status": 201, "projectId": "..." },
     { "id": "admin_package_download", "ok": true, "status": 200, "artifactName": "package.zip", "projectId": "...", "bytes": 2048 },
-    { "id": "artifact_cross_owner_forbidden", "ok": true, "status": 403 }
+    { "id": "artifact_cross_owner_forbidden", "ok": true, "status": 403, "artifactName": "package.zip", "targetProjectId": "different-project-id" }
   ]
 }
 ```

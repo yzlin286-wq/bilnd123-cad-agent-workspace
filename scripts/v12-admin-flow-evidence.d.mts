@@ -6,6 +6,7 @@ export type AdminFlowEvidenceCheck = {
   artifactName?: string;
   bytes?: number;
   projectId?: string;
+  targetProjectId?: string;
   [key: string]: unknown;
 };
 
@@ -40,6 +41,7 @@ export type AdminFlowEvidenceResult = {
     artifactName: string;
     bytes?: number;
     projectId: string;
+    targetProjectId: string;
   }>;
   issues: Array<{
     id: string;

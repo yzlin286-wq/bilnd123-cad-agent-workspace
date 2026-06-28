@@ -233,7 +233,7 @@ docker compose -f docker-compose.staging.yml exec cad-agent \
   cat /app/logs/v12-admin-verify.json > outputs/reports/v12-admin-verify.json
 ```
 
-After real Clerk login testing, capture sanitized admin flow evidence. Do not include cookies, Basic Auth headers, passwords, API keys, full prompts, provider raw errors, tracebacks, or server paths.
+After real Clerk login testing, capture sanitized admin flow evidence. Do not include cookies, Basic Auth headers, passwords, API keys, full prompts, provider raw errors, tracebacks, or server paths. Use the same `projectId` from `admin_project_create` in `admin_package_download`. For `artifact_cross_owner_forbidden`, include a `targetProjectId` for a different project that owns the target `package.zip`.
 
 ```json
 {
@@ -247,7 +247,7 @@ After real Clerk login testing, capture sanitized admin flow evidence. Do not in
     { "id": "non_admin_admin_blocked", "ok": true, "status": 403 },
     { "id": "admin_project_create", "ok": true, "status": 201, "projectId": "..." },
     { "id": "admin_package_download", "ok": true, "status": 200, "artifactName": "package.zip", "projectId": "...", "bytes": 2048 },
-    { "id": "artifact_cross_owner_forbidden", "ok": true, "status": 403 }
+    { "id": "artifact_cross_owner_forbidden", "ok": true, "status": 403, "artifactName": "package.zip", "targetProjectId": "different-project-id" }
   ]
 }
 ```
@@ -334,7 +334,7 @@ The gate verifies:
 - the `admin_package_download.projectId` matches the `admin_project_create.projectId`
 - the admin flow evidence commit matches the deployed `APP_COMMIT_SHA`
 - the sanitized evidence verifies a non-admin Clerk user is blocked from `/admin`
-- the sanitized evidence verifies a cross-owner artifact download attempt returns `403`
+- the sanitized evidence verifies a cross-owner `package.zip` download attempt targets a different `targetProjectId` and returns `403`
 
 This command intentionally fails against the temporary HTTP + Basic Auth staging posture. Use `smoke:staging` for temporary HTTP smoke checks; use `handoff:check` only for the final v1.2 SaaS access handoff claim. Run it on the staging host when the admin password is delivered through a server-only file; use `V12_ADMIN_PASSWORD_DELIVERY=secure_channel` only when the initial password is delivered out of band.
 

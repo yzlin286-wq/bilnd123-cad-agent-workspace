@@ -60,8 +60,18 @@ const REQUIRED_CHECKS = [
   {
     id: "artifact_cross_owner_forbidden",
     flag: "artifactAuthzVerified",
-    message: "Cross-owner artifact download must be verified to return 403.",
-    predicate: (check) => check.ok === true && numberValue(check.status) === 403,
+    message: "Cross-owner package.zip download must target a different project and return 403.",
+    predicate: (check, context) => {
+      const targetProjectId = stringValue(check.targetProjectId);
+      return (
+        check.ok === true &&
+        numberValue(check.status) === 403 &&
+        stringValue(check.artifactName) === "package.zip" &&
+        Boolean(context.createdProjectId) &&
+        Boolean(targetProjectId) &&
+        targetProjectId !== context.createdProjectId
+      );
+    },
   },
 ];
 
@@ -167,6 +177,7 @@ function sanitizeCheck(id, check, ok) {
     artifactName: stringValue(checkRecord.artifactName),
     bytes: numberOrUndefined(checkRecord.bytes),
     projectId: stringValue(checkRecord.projectId),
+    targetProjectId: stringValue(checkRecord.targetProjectId),
   };
 }
 

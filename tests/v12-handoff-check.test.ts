@@ -130,7 +130,7 @@ test("handoff:check fails the current HTTP Basic Auth fallback posture without l
           { id: "non_admin_admin_blocked", ok: true, status: 302, location: "/app" },
           { id: "admin_project_create", ok: true, status: 201, projectId: "project_123" },
           { id: "admin_package_download", ok: true, status: 200, artifactName: "package.zip", projectId: "project_123", bytes: 2048 },
-          { id: "artifact_cross_owner_forbidden", ok: true, status: 403 },
+          { id: "artifact_cross_owner_forbidden", ok: true, status: 403, artifactName: "package.zip", targetProjectId: "project_456" },
         ],
       }),
       "utf8",
