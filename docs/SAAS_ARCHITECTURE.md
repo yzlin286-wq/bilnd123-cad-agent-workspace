@@ -47,7 +47,7 @@ ADMIN_BOOTSTRAP_ENV_FILE=/opt/bilnd123-cad-agent-workspace/.env \
 npm run admin:bootstrap
 ```
 
-The bootstrap script creates or updates a Clerk user, sets admin metadata, optionally merges the email into `SAAS_ADMIN_EMAILS`, and can write the one-time password to a chmod `600` server-only file. It never prints the password.
+The bootstrap script creates or updates a Clerk user, sets admin metadata, applies the supplied one-time password by default, optionally merges the email into `SAAS_ADMIN_EMAILS`, and can write the one-time password to a chmod `600` server-only file. It never prints the password.
 
 ## Data
 

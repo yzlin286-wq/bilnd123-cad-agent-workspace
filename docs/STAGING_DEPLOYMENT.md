@@ -136,6 +136,7 @@ ADMIN_BOOTSTRAP_EMAIL=admin@example.com \
 ADMIN_BOOTSTRAP_PASSWORD=replace-with-one-time-password \
 ADMIN_BOOTSTRAP_FIRST_NAME=CAD \
 ADMIN_BOOTSTRAP_LAST_NAME=Admin \
+ADMIN_BOOTSTRAP_RESET_PASSWORD=1 \
 ADMIN_BOOTSTRAP_CREDENTIAL_PATH=/opt/bilnd123-cad-agent-workspace/admin-credential.txt \
 ADMIN_BOOTSTRAP_ENV_FILE=/opt/bilnd123-cad-agent-workspace/.env \
 npm run admin:bootstrap
@@ -144,10 +145,13 @@ npm run admin:bootstrap
 The script:
 
 - creates or updates a Clerk user
+- applies the supplied one-time password to new users and, by default, existing users
 - sets Clerk public/private metadata `role=admin`
 - optionally merges the email into `SAAS_ADMIN_EMAILS`
 - optionally writes the one-time password to a chmod `600` server-only file
 - never prints the password
+
+Set `ADMIN_BOOTSTRAP_RESET_PASSWORD=0` only if the Clerk admin already exists and password rotation is being handled through another secure channel. For v1.2 handoff, leave the default enabled so the delivered initial password can be verified.
 
 After bootstrapping, restart the app so changed `.env` values are loaded.
 

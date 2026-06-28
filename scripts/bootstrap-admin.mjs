@@ -10,6 +10,7 @@ const firstName = process.env.ADMIN_BOOTSTRAP_FIRST_NAME || "CAD";
 const lastName = process.env.ADMIN_BOOTSTRAP_LAST_NAME || "Admin";
 const credentialPath = process.env.ADMIN_BOOTSTRAP_CREDENTIAL_PATH;
 const envFile = process.env.ADMIN_BOOTSTRAP_ENV_FILE;
+const shouldSetExistingUserPassword = process.env.ADMIN_BOOTSTRAP_RESET_PASSWORD !== "0";
 
 if (password.length < 12) {
   fail("ADMIN_BOOTSTRAP_PASSWORD must be at least 12 characters.");
@@ -23,17 +24,19 @@ try {
   const metadata = { role: "admin" };
   let user;
   let created = false;
+  let passwordUpdated = false;
 
   if (currentUser) {
     user = await clerk.users.updateUserMetadata(currentUser.id, {
       publicMetadata: { ...(currentUser.publicMetadata || {}), ...metadata },
       privateMetadata: { ...(currentUser.privateMetadata || {}), ...metadata },
     });
-    if (process.env.ADMIN_BOOTSTRAP_RESET_PASSWORD === "1") {
+    if (shouldSetExistingUserPassword) {
       user = await clerk.users.updateUser(currentUser.id, {
         password,
         signOutOfOtherSessions: true,
       });
+      passwordUpdated = true;
     }
   } else {
     user = await clerk.users.createUser({
@@ -45,6 +48,7 @@ try {
       privateMetadata: metadata,
     });
     created = true;
+    passwordUpdated = true;
   }
 
   if (envFile) {
@@ -61,6 +65,7 @@ try {
       userId: user.id,
       email,
       role: "admin",
+      passwordUpdated,
       passwordDeliveredToFile: Boolean(credentialPath),
       envFileUpdated: Boolean(envFile),
     }),

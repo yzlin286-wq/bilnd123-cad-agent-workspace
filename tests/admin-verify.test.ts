@@ -78,6 +78,8 @@ test("admin:bootstrap loads Clerk lazily and keeps config failures sanitized", a
   const source = readFileSync(path.join(process.cwd(), "scripts/bootstrap-admin.mjs"), "utf8");
   assert.doesNotMatch(source, /import\s+\{\s*createClerkClient\s*\}\s+from\s+["']@clerk\/backend["']/);
   assert.match(source, /await import\(["']@clerk\/backend["']\)/);
+  assert.match(source, /ADMIN_BOOTSTRAP_RESET_PASSWORD !== "0"/);
+  assert.match(source, /passwordUpdated/);
 
   const result = await runNode(process.execPath, ["scripts/bootstrap-admin.mjs"], {
     cwd: process.cwd(),
