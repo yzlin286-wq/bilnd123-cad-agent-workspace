@@ -2,7 +2,7 @@
 
 import dns from "node:dns/promises";
 import { existsSync } from "node:fs";
-import { mkdir, stat, writeFile } from "node:fs/promises";
+import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import { isIP } from "node:net";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -31,6 +31,8 @@ export function evaluateV12Handoff({
   credentialPath,
   passwordDelivery,
   credentialInspection,
+  adminVerifyPath,
+  adminVerification,
   adminLoginVerified,
   adminPageVerified,
   nonAdminBlockedVerified,
@@ -49,6 +51,8 @@ export function evaluateV12Handoff({
   const httpRedirectRecord = record(httpRedirect);
   const normalizedDelivery = normalizePasswordDelivery(passwordDelivery, credentialPath);
   const credentialRecord = record(credentialInspection);
+  const adminVerificationRecord = record(adminVerification);
+  const adminVerificationEvidence = record(adminVerificationRecord.evidence);
 
   add(checks, "base_url_present", Boolean(baseUrl), "A staging base URL is required.");
   add(checks, "base_url_https", isHttpsUrl(baseUrl), "The v1.2 handoff URL must use HTTPS.");
@@ -121,6 +125,12 @@ export function evaluateV12Handoff({
   if (normalizedDelivery === "secure_channel") {
     add(checks, "admin_password_secure_channel_declared", true, "A secure one-time password channel was declared.");
   }
+  add(
+    checks,
+    "clerk_admin_identity_verified",
+    adminVerificationRecord.ok === true && adminVerificationEvidence.adminAuthorized === true,
+    "The declared admin must be verified through Clerk Backend API and authorized as admin.",
+  );
   add(checks, "admin_login_verified", adminLoginVerified === true, "A real Clerk admin login must be verified.");
   add(checks, "admin_page_verified", adminPageVerified === true, "The logged-in admin must be verified to access /admin.");
   add(checks, "non_admin_admin_blocked", nonAdminBlockedVerified === true, "A non-admin Clerk user must be blocked from /admin.");
@@ -181,6 +191,10 @@ export function evaluateV12Handoff({
         email: stringValue(adminEmail),
         passwordDelivery: normalizedDelivery,
         credentialPath: normalizedDelivery === "server_file" ? stringValue(credentialPath) : "",
+        verifyPath: stringValue(adminVerifyPath),
+        clerkIdentityVerified: adminVerificationRecord.ok === true,
+        clerkAdminAuthorized: adminVerificationEvidence.adminAuthorized === true,
+        userId: stringValue(adminVerificationRecord.userId),
       },
       verification: {
         adminLoginVerified: adminLoginVerified === true,
@@ -236,6 +250,8 @@ async function main() {
   const httpRedirect = baseUrl ? await probeHttpRedirect(baseUrl) : undefined;
   const ipFallbackProbe = ipFallbackUrl ? await probeIpFallback(ipFallbackUrl, authHeader) : {};
   const credentialInspection = credentialPath ? await inspectCredentialFile(credentialPath) : undefined;
+  const adminVerifyPath = options.adminVerifyPath || process.env.V12_ADMIN_VERIFY_PATH;
+  const adminVerification = adminVerifyPath ? await readJsonIfPresent(adminVerifyPath) : undefined;
   const result = evaluateV12Handoff({
     baseUrl,
     expectedIp,
@@ -243,6 +259,8 @@ async function main() {
     adminEmail,
     credentialPath,
     passwordDelivery,
+    adminVerifyPath,
+    adminVerification,
     adminLoginVerified: options.adminLoginVerified || envFlag("V12_ADMIN_LOGIN_VERIFIED"),
     adminPageVerified: options.adminPageVerified || envFlag("V12_ADMIN_PAGE_VERIFIED"),
     nonAdminBlockedVerified: options.nonAdminBlockedVerified || envFlag("V12_NON_ADMIN_BLOCKED_VERIFIED"),
@@ -365,6 +383,7 @@ function parseArgs(args) {
     else if (arg === "--admin-email") options.adminEmail = args[++index];
     else if (arg === "--credential-path") options.credentialPath = args[++index];
     else if (arg === "--password-delivery") options.passwordDelivery = args[++index];
+    else if (arg === "--admin-verify-path") options.adminVerifyPath = args[++index];
     else if (arg === "--admin-login-verified") options.adminLoginVerified = true;
     else if (arg === "--admin-page-verified") options.adminPageVerified = true;
     else if (arg === "--non-admin-blocked-verified") options.nonAdminBlockedVerified = true;
@@ -373,6 +392,14 @@ function parseArgs(args) {
     else if (arg === "--artifact-authz-verified") options.artifactAuthzVerified = true;
   }
   return options;
+}
+
+async function readJsonIfPresent(filePath) {
+  try {
+    return JSON.parse(await readFile(path.resolve(filePath), "utf8"));
+  } catch {
+    return undefined;
+  }
 }
 
 async function inspectCredentialFile(filePath) {

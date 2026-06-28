@@ -41,6 +41,10 @@ export type V12HandoffResult = {
       email: string;
       passwordDelivery: string;
       credentialPath: string;
+      verifyPath: string;
+      clerkIdentityVerified: boolean;
+      clerkAdminAuthorized: boolean;
+      userId: string;
     };
     verification: {
       adminLoginVerified: boolean;

@@ -7,6 +7,7 @@
     "build": "next build",
     "cleanup:cad": "node scripts/cleanup-cad-outputs.mjs",
     "admin:bootstrap": "node scripts/bootstrap-admin.mjs",
+    "admin:verify": "node scripts/verify-admin.mjs",
     "db:migrate": "node scripts/migrate-postgres.mjs",
     "failures:export": "node scripts/export-failures.mjs",
     "handoff:check": "node scripts/v12-handoff-check.mjs",

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { createServer } from "node:http";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -91,6 +91,7 @@ test("handoff:check fails the current HTTP Basic Auth fallback posture without l
     assert.match(failedIds.join(","), /admin_requires_clerk_session/);
     assert.match(failedIds.join(","), /admin_email_declared/);
     assert.match(failedIds.join(","), /admin_password_delivery_declared/);
+    assert.match(failedIds.join(","), /clerk_admin_identity_verified/);
     assert.match(failedIds.join(","), /admin_login_verified/);
     assert.match(failedIds.join(","), /admin_project_create_verified/);
     assert.match(failedIds.join(","), /admin_package_download_verified/);
@@ -100,6 +101,17 @@ test("handoff:check fails the current HTTP Basic Auth fallback posture without l
     assert.equal(report.observed.dataLayer.mode, "postgres");
 
     const missingCredentialPath = path.join(outputDir, "missing-admin-credential.txt");
+    const adminVerifyPath = path.join(outputDir, "admin-verify.json");
+    writeFileSync(
+      adminVerifyPath,
+      JSON.stringify({
+        ok: true,
+        adminEmail: "admin@example.com",
+        userId: "user_admin",
+        evidence: { adminAuthorized: true },
+      }),
+      "utf8",
+    );
     const missingCredentialResult = await runNode(
       process.execPath,
       [
@@ -114,6 +126,8 @@ test("handoff:check fails the current HTTP Basic Auth fallback posture without l
         "admin@example.com",
         "--credential-path",
         missingCredentialPath,
+        "--admin-verify-path",
+        adminVerifyPath,
         "--output",
         outputPath,
       ],
@@ -133,6 +147,7 @@ test("handoff:check fails the current HTTP Basic Auth fallback posture without l
       .map((check: { id: string }) => check.id);
     assert.equal(credentialReport.checks.find((check: { id: string }) => check.id === "ip_fallback_unauth_401")?.ok, true);
     assert.equal(credentialReport.checks.find((check: { id: string }) => check.id === "ip_fallback_health_200")?.ok, true);
+    assert.equal(credentialReport.checks.find((check: { id: string }) => check.id === "clerk_admin_identity_verified")?.ok, true);
     assert.match(credentialFailedIds.join(","), /admin_credential_file_exists/);
     assert.match(credentialFailedIds.join(","), /admin_credential_file_private/);
   } finally {

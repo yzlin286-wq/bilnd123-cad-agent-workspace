@@ -46,6 +46,8 @@ export function renderV12HandoffReport(report) {
     `- Admin password: ${passwordDeliveryText(admin)}`,
     `- Password rotation required: ${admin.passwordDelivery ? "yes" : "not verified"}`,
     `- Clerk configured: ${yesNo(auth.clerkConfigured)}`,
+    `- Clerk admin identity verified: ${yesNo(admin.clerkIdentityVerified)}`,
+    `- Clerk admin authorized: ${yesNo(admin.clerkAdminAuthorized)}`,
     `- Dev auth bypass disabled: ${auth.devBypassEnabled === false ? "yes" : "no"}`,
     `- /admin verified: ${yesNo(verification.adminPageVerified)}`,
     "",
@@ -95,6 +97,9 @@ function actionItems(checks) {
   }
   if (failedIds.has("health_clerk_configured") || failedIds.has("clerk_sign_in_rendered")) {
     items.push("- Configure real Clerk keys and bootstrap a real admin user.");
+  }
+  if (failedIds.has("clerk_admin_identity_verified")) {
+    items.push("- Run npm run admin:verify with real Clerk keys and pass its output to handoff:check.");
   }
   if (failedIds.has("health_data_layer_postgres")) {
     items.push("- Configure DATABASE_URL, run migrations, and verify Postgres health.");

@@ -206,7 +206,16 @@ The smoke script checks `/api/health`, creates a `mounting_plate`, revises thick
 
 ## v1.2 Handoff Gate
 
-After the real HTTPS domain, Clerk keys, Postgres, and admin bootstrap are configured, run the strict handoff gate:
+After the real HTTPS domain, Clerk keys, Postgres, and admin bootstrap are configured, verify the Clerk admin:
+
+```bash
+CLERK_SECRET_KEY=... \
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=... \
+V12_ADMIN_EMAIL=admin@example.com \
+npm run admin:verify -- --output outputs/reports/v12-admin-verify.json
+```
+
+Then run the strict handoff gate:
 
 ```bash
 STAGING_BASE_URL=https://cad-agent.example.com \
@@ -217,6 +226,7 @@ V12_IP_FALLBACK_URL=http://203.0.113.10:12602 \
 V12_ADMIN_EMAIL=admin@example.com \
 V12_ADMIN_PASSWORD_DELIVERY=server_file \
 V12_ADMIN_CREDENTIAL_PATH=/opt/bilnd123-cad-agent-workspace/admin-credential.txt \
+V12_ADMIN_VERIFY_PATH=outputs/reports/v12-admin-verify.json \
 V12_ADMIN_LOGIN_VERIFIED=1 \
 V12_ADMIN_PAGE_VERIFIED=1 \
 V12_NON_ADMIN_BLOCKED_VERIFIED=1 \
@@ -246,6 +256,7 @@ The gate verifies:
 - `/app` and `/admin` do not return 200 when only the outer staging Basic Auth is satisfied and no Clerk session exists
 - admin email and password delivery are declared
 - when `V12_ADMIN_PASSWORD_DELIVERY=server_file`, the credential file exists and is not readable by group/world users
+- `npm run admin:verify` confirms the declared Clerk user exists, has password login enabled, is not banned or locked, and is authorized as admin by metadata or allowlist
 - the real Clerk admin can log in, reach `/admin`, create a CAD project, and download their own `package.zip`
 - a non-admin Clerk user is blocked from `/admin`
 - a cross-owner artifact download attempt returns `403`
