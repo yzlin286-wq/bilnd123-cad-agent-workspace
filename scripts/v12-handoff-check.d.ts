@@ -61,6 +61,7 @@ export type V12HandoffResult = {
       artifactAuthzVerified: boolean;
       evidenceVerified: boolean;
       evidenceGeneratedAt: string;
+      evidenceCommit: string;
     };
   };
   summary: {

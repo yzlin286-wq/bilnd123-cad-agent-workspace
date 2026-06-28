@@ -241,6 +241,7 @@ Capture a sanitized admin flow evidence file after the real Clerk admin signs in
   "generatedAt": "2026-06-28T12:00:00.000Z",
   "baseUrl": "https://cad-agent.example.com",
   "adminEmail": "admin@example.com",
+  "build": { "commitSha": "85e517e" },
   "checks": [
     { "id": "admin_login", "ok": true, "status": 200 },
     { "id": "admin_page_access", "ok": true, "status": 200 },
@@ -253,7 +254,7 @@ Capture a sanitized admin flow evidence file after the real Clerk admin signs in
 ```
 
 ```bash
-npm run admin:flow:verify -- --input outputs/reports/v12-admin-flow-evidence.json --output outputs/reports/v12-admin-flow-verify.json
+npm run admin:flow:verify -- --input outputs/reports/v12-admin-flow-evidence.json --expected-commit "$(git rev-parse --short HEAD)" --output outputs/reports/v12-admin-flow-verify.json
 ```
 
 Run the v1.2 handoff gate only when a real HTTPS domain and Clerk keys are configured:
@@ -271,7 +272,7 @@ V12_ADMIN_EMAIL=admin@example.com \
 V12_ADMIN_PASSWORD_DELIVERY=server_file \
 V12_ADMIN_CREDENTIAL_PATH=/opt/bilnd123-cad-agent-workspace/admin-credential.txt \
 V12_ADMIN_VERIFY_PATH=outputs/reports/v12-admin-verify.json \
-V12_ADMIN_FLOW_EVIDENCE_PATH=outputs/reports/v12-admin-flow-evidence.json \
+V12_ADMIN_FLOW_EVIDENCE_PATH=outputs/reports/v12-admin-flow-verify.json \
 npm run handoff:check -- --expected-commit "$(git rev-parse --short HEAD)" --output outputs/reports/v12-handoff-check.json
 ```
 

@@ -51,6 +51,7 @@ export function renderV12HandoffReport(report) {
     `- Clerk admin identity verified: ${yesNo(admin.clerkIdentityVerified)}`,
     `- Clerk admin authorized: ${yesNo(admin.clerkAdminAuthorized)}`,
     `- Admin flow evidence: ${yesNo(verification.evidenceVerified)}${admin.flowEvidencePath ? ` (${stringValue(admin.flowEvidencePath)})` : ""}`,
+    `- Admin flow evidence commit: ${stringValue(verification.evidenceCommit) || "not reported"}`,
     `- Dev auth bypass disabled: ${auth.devBypassEnabled === false ? "yes" : "no"}`,
     `- /admin verified: ${yesNo(verification.adminPageVerified)}`,
     "",

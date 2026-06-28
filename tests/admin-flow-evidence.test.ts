@@ -6,6 +6,7 @@ const completeEvidence = {
   generatedAt: "2026-06-28T12:00:00.000Z",
   baseUrl: "https://cad-agent.example.com",
   adminEmail: "Admin@Example.com",
+  build: { commitSha: "85E517E" },
   checks: [
     { id: "admin_login", ok: true, status: 200 },
     { id: "admin_page_access", ok: true, status: 200 },
@@ -20,10 +21,13 @@ test("admin flow evidence verifies real handoff flags without prompts or secrets
   const result = evaluateAdminFlowEvidence(completeEvidence, {
     expectedBaseUrl: "https://cad-agent.example.com",
     expectedAdminEmail: "admin@example.com",
+    expectedCommit: "85e517e",
   });
 
   assert.equal(result.ok, true);
   assert.equal(result.adminEmail, "admin@example.com");
+  assert.equal(result.build.deployedCommit, "85e517e");
+  assert.equal(result.build.expectedCommit, "85e517e");
   assert.equal(result.flags.adminLoginVerified, true);
   assert.equal(result.flags.adminPageVerified, true);
   assert.equal(result.flags.nonAdminBlockedVerified, true);
@@ -31,6 +35,17 @@ test("admin flow evidence verifies real handoff flags without prompts or secrets
   assert.equal(result.flags.adminPackageDownloadVerified, true);
   assert.equal(result.flags.artifactAuthzVerified, true);
   assert.equal(JSON.stringify(result).includes("should-not-be-here"), false);
+});
+
+test("admin flow evidence rejects mismatched deploy commit", () => {
+  const result = evaluateAdminFlowEvidence(completeEvidence, {
+    expectedBaseUrl: "https://cad-agent.example.com",
+    expectedAdminEmail: "admin@example.com",
+    expectedCommit: "4d7d7c3",
+  });
+
+  assert.equal(result.ok, false);
+  assert.match(result.issues.map((issue: { id: string }) => issue.id).join(","), /commit_mismatch/);
 });
 
 test("admin flow evidence rejects secret-like fields and redacts output", () => {

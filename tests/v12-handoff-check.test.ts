@@ -123,6 +123,7 @@ test("handoff:check fails the current HTTP Basic Auth fallback posture without l
         generatedAt: "2026-06-28T12:00:00.000Z",
         baseUrl: `http://127.0.0.1:${port}`,
         adminEmail: "admin@example.com",
+        build: { commitSha: "4d7d7c3" },
         checks: [
           { id: "admin_login", ok: true, status: 200 },
           { id: "admin_page_access", ok: true, status: 200 },
@@ -181,6 +182,7 @@ test("handoff:check fails the current HTTP Basic Auth fallback posture without l
     assert.equal(credentialReport.checks.find((check: { id: string }) => check.id === "clerk_admin_email_matches")?.ok, true);
     assert.equal(credentialReport.checks.find((check: { id: string }) => check.id === "clerk_admin_identity_verified")?.ok, true);
     assert.equal(credentialReport.checks.find((check: { id: string }) => check.id === "admin_flow_evidence_verified")?.ok, true);
+    assert.equal(credentialReport.observed.verification.evidenceCommit, "4d7d7c3");
     assert.equal(credentialReport.checks.find((check: { id: string }) => check.id === "admin_login_verified")?.ok, true);
     assert.equal(credentialReport.checks.find((check: { id: string }) => check.id === "admin_project_create_verified")?.ok, true);
     assert.equal(credentialReport.checks.find((check: { id: string }) => check.id === "admin_package_download_verified")?.ok, true);

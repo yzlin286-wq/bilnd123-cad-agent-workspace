@@ -240,6 +240,7 @@ After real Clerk login testing, capture sanitized admin flow evidence. Do not in
   "generatedAt": "2026-06-28T12:00:00.000Z",
   "baseUrl": "https://cad-agent.example.com",
   "adminEmail": "admin@example.com",
+  "build": { "commitSha": "85e517e" },
   "checks": [
     { "id": "admin_login", "ok": true, "status": 200 },
     { "id": "admin_page_access", "ok": true, "status": 200 },
@@ -254,7 +255,7 @@ After real Clerk login testing, capture sanitized admin flow evidence. Do not in
 Verify that evidence before handoff:
 
 ```bash
-npm run admin:flow:verify -- --input outputs/reports/v12-admin-flow-evidence.json --output outputs/reports/v12-admin-flow-verify.json
+npm run admin:flow:verify -- --input outputs/reports/v12-admin-flow-evidence.json --expected-commit "$(git rev-parse --short HEAD)" --output outputs/reports/v12-admin-flow-verify.json
 ```
 
 Audit the server-only `.env` before handoff. This report prints only booleans, file modes, and blockers; it must not print the actual Clerk keys, Basic Auth password, `DATABASE_URL`, or admin password.
@@ -281,7 +282,7 @@ V12_ADMIN_EMAIL=admin@example.com \
 V12_ADMIN_PASSWORD_DELIVERY=server_file \
 V12_ADMIN_CREDENTIAL_PATH=/opt/bilnd123-cad-agent-workspace/admin-credential.txt \
 V12_ADMIN_VERIFY_PATH=outputs/reports/v12-admin-verify.json \
-V12_ADMIN_FLOW_EVIDENCE_PATH=outputs/reports/v12-admin-flow-evidence.json \
+V12_ADMIN_FLOW_EVIDENCE_PATH=outputs/reports/v12-admin-flow-verify.json \
 npm run handoff:check -- --expected-commit "$(git rev-parse --short HEAD)" --output outputs/reports/v12-handoff-check.json
 ```
 
@@ -329,7 +330,8 @@ The gate verifies:
 - when `V12_ADMIN_PASSWORD_DELIVERY=server_file`, the credential file exists and is not readable by group/world users
 - `npm run admin:verify` confirms the declared Clerk user exists, has password login enabled, is not banned or locked, and is authorized as admin by metadata or allowlist
 - the admin verification report email must match the declared `--admin-email` / `V12_ADMIN_EMAIL`
-- `V12_ADMIN_FLOW_EVIDENCE_PATH` points to sanitized evidence that verifies the real Clerk admin can log in, reach `/admin`, create a CAD project, and download their own `package.zip`
+- `V12_ADMIN_FLOW_EVIDENCE_PATH` points to the sanitized `admin:flow:verify` output that verifies the real Clerk admin can log in, reach `/admin`, create a CAD project, and download their own `package.zip`
+- the admin flow evidence commit matches the deployed `APP_COMMIT_SHA`
 - the sanitized evidence verifies a non-admin Clerk user is blocked from `/admin`
 - the sanitized evidence verifies a cross-owner artifact download attempt returns `403`
 

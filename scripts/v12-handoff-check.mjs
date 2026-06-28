@@ -66,6 +66,7 @@ export function evaluateV12Handoff({
     declaredAdminEmail && verifiedAdminEmail && declaredAdminEmail === verifiedAdminEmail,
   );
   const adminFlowEvidenceRecord = record(adminFlowEvidence);
+  const adminFlowEvidenceBuild = record(adminFlowEvidenceRecord.build);
 
   add(checks, "base_url_present", Boolean(baseUrl), "A staging base URL is required.");
   add(checks, "base_url_https", isHttpsUrl(baseUrl), "The v1.2 handoff URL must use HTTPS.");
@@ -244,6 +245,7 @@ export function evaluateV12Handoff({
         artifactAuthzVerified: artifactAuthzVerified === true,
         evidenceVerified: adminFlowEvidenceRecord.ok === true,
         evidenceGeneratedAt: stringValue(adminFlowEvidenceRecord.evidenceGeneratedAt),
+        evidenceCommit: normalizeCommitSha(adminFlowEvidenceBuild.deployedCommit),
       },
     },
     summary: {
@@ -296,7 +298,11 @@ async function main() {
   const adminVerification = adminVerifyPath ? await readJsonIfPresent(adminVerifyPath) : undefined;
   const adminFlowEvidencePath = options.adminFlowEvidencePath || process.env.V12_ADMIN_FLOW_EVIDENCE_PATH;
   const adminFlowEvidence = adminFlowEvidencePath
-    ? evaluateAdminFlowEvidence(await readJsonIfPresent(adminFlowEvidencePath), { expectedBaseUrl: baseUrl, expectedAdminEmail: adminEmail })
+    ? evaluateAdminFlowEvidence(await readJsonIfPresent(adminFlowEvidencePath), {
+        expectedBaseUrl: baseUrl,
+        expectedAdminEmail: adminEmail,
+        expectedCommit,
+      })
     : undefined;
   const adminFlowFlags = record(adminFlowEvidence?.flags);
   const result = evaluateV12Handoff({

@@ -63,8 +63,9 @@ const REQUIRED_CHECKS = [
   },
 ];
 
-export function evaluateAdminFlowEvidence(evidence, { expectedBaseUrl, expectedAdminEmail } = {}) {
+export function evaluateAdminFlowEvidence(evidence, { expectedBaseUrl, expectedAdminEmail, expectedCommit } = {}) {
   const evidenceRecord = record(evidence);
+  const evidenceBuild = record(evidenceRecord.build);
   const checksById = new Map(arrayValue(evidenceRecord.checks).map((check) => [stringValue(check.id), record(check)]));
   const issues = [];
   const safeChecks = [];
@@ -72,6 +73,11 @@ export function evaluateAdminFlowEvidence(evidence, { expectedBaseUrl, expectedA
   const generatedAt = stringValue(evidenceRecord.generatedAt);
   const baseUrl = safeUrl(evidenceRecord.baseUrl);
   const adminEmail = normalizeEmail(evidenceRecord.adminEmail);
+  const normalizedExpectedCommit = normalizeCommitSha(expectedCommit);
+  const evidenceCommit =
+    normalizeCommitSha(evidenceBuild.commitSha) ||
+    normalizeCommitSha(evidenceBuild.deployedCommit) ||
+    normalizeCommitSha(evidenceRecord.commitSha);
   const secretScan = scanForSecrets(evidenceRecord);
 
   if (!generatedAt || Number.isNaN(Date.parse(generatedAt))) {
@@ -88,6 +94,12 @@ export function evaluateAdminFlowEvidence(evidence, { expectedBaseUrl, expectedA
   }
   if (expectedAdminEmail && adminEmail && normalizeEmail(expectedAdminEmail) !== adminEmail) {
     issues.push({ id: "admin_email_mismatch", message: "Admin flow evidence adminEmail must match the declared handoff admin." });
+  }
+  if (normalizedExpectedCommit && !evidenceCommit) {
+    issues.push({ id: "commit_missing", message: "Admin flow evidence must include the deployed commit." });
+  }
+  if (normalizedExpectedCommit && evidenceCommit && !commitsMatch(evidenceCommit, normalizedExpectedCommit)) {
+    issues.push({ id: "commit_mismatch", message: "Admin flow evidence commit must match the expected deployed commit." });
   }
   if (secretScan.found) {
     issues.push({ id: "secret_like_value_detected", message: "Admin flow evidence must not include passwords, API keys, or auth headers." });
@@ -109,6 +121,10 @@ export function evaluateAdminFlowEvidence(evidence, { expectedBaseUrl, expectedA
     evidenceGeneratedAt: generatedAt,
     baseUrl,
     adminEmail,
+    build: {
+      expectedCommit: normalizedExpectedCommit,
+      deployedCommit: evidenceCommit,
+    },
     flags,
     summary: {
       total: REQUIRED_CHECKS.length,
@@ -129,6 +145,7 @@ async function main() {
   const result = evaluateAdminFlowEvidence(evidence, {
     expectedBaseUrl: options.expectedBaseUrl,
     expectedAdminEmail: options.expectedAdminEmail,
+    expectedCommit: options.expectedCommit || process.env.V12_EXPECTED_COMMIT || process.env.APP_COMMIT_SHA,
   });
   await writeJson(output, result);
   console.log(JSON.stringify(result, null, 2));
@@ -187,6 +204,16 @@ function normalizeEmail(value) {
   return stringValue(value).trim().toLowerCase();
 }
 
+function normalizeCommitSha(value) {
+  const normalized = stringValue(value).trim().toLowerCase();
+  return /^[0-9a-f]{7,40}$/.test(normalized) ? normalized : "";
+}
+
+function commitsMatch(deployedCommit, expectedCommit) {
+  if (!deployedCommit || !expectedCommit) return false;
+  return deployedCommit === expectedCommit || deployedCommit.startsWith(expectedCommit) || expectedCommit.startsWith(deployedCommit);
+}
+
 function parseArgs(args) {
   const options = {};
   for (let index = 0; index < args.length; index += 1) {
@@ -195,6 +222,7 @@ function parseArgs(args) {
     else if (arg === "--output") options.output = args[++index];
     else if (arg === "--expected-base-url") options.expectedBaseUrl = args[++index];
     else if (arg === "--expected-admin-email") options.expectedAdminEmail = args[++index];
+    else if (arg === "--expected-commit") options.expectedCommit = args[++index];
   }
   return options;
 }

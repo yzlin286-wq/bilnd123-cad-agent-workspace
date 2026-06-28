@@ -59,6 +59,7 @@ test("handoff:report renders a sanitized v1.2 handoff report", async () => {
               adminPackageDownloadVerified: false,
               artifactAuthzVerified: false,
               evidenceVerified: false,
+              evidenceCommit: "4d7d7c3",
             },
           },
           summary: { total: 4, passed: 1, failed: 3 },
@@ -89,6 +90,7 @@ test("handoff:report renders a sanitized v1.2 handoff report", async () => {
     assert.match(markdown, /Admin email: admin@example\.com/);
     assert.match(markdown, /Admin password: server-only file/);
     assert.match(markdown, /Admin flow evidence: no/);
+    assert.match(markdown, /Admin flow evidence commit: 4d7d7c3/);
     assert.match(markdown, /Configure DNS, Caddy HTTPS/);
     assert.match(markdown, /Configure real Clerk keys/);
     assert.match(markdown, /Capture sanitized admin flow evidence/);

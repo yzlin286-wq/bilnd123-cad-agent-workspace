@@ -15,6 +15,10 @@ export type AdminFlowEvidenceResult = {
   evidenceGeneratedAt: string;
   baseUrl: string;
   adminEmail: string;
+  build: {
+    expectedCommit: string;
+    deployedCommit: string;
+  };
   flags: {
     adminLoginVerified: boolean;
     adminPageVerified: boolean;
@@ -54,5 +58,6 @@ export function evaluateAdminFlowEvidence(
   options?: {
     expectedBaseUrl?: string;
     expectedAdminEmail?: string;
+    expectedCommit?: string;
   },
 ): AdminFlowEvidenceResult;
