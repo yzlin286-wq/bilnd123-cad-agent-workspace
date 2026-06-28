@@ -75,5 +75,17 @@ export type V12HandoffResult = {
 };
 
 export function evaluateV12Handoff(input?: Record<string, unknown>): V12HandoffResult;
+export function inspectCredentialFile(
+  filePath: string,
+  adminEmail?: string,
+): Promise<{
+  checked: boolean;
+  exists: boolean;
+  privatePermissions: boolean;
+  emailMatches: boolean;
+  passwordPresent: boolean;
+  rotationRequired: boolean;
+  mode?: string;
+}>;
 export function safeUrl(value?: string): string;
 export function isProtectedResponse(status?: number, location?: string): boolean;

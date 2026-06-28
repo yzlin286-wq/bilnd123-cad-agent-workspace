@@ -1,12 +1,12 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { createServer } from "node:http";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { evaluateV12Handoff } from "../scripts/v12-handoff-check.mjs";
+import { evaluateV12Handoff, inspectCredentialFile } from "../scripts/v12-handoff-check.mjs";
 
 test("handoff:check fails the current HTTP Basic Auth fallback posture without leaking credentials", async () => {
   const server = createServer((request, response) => {
@@ -349,6 +349,51 @@ test("handoff:check validates server-file admin credential contents without stor
   assert.equal(checks.get("admin_credential_email_matches"), false);
   assert.equal(checks.get("admin_credential_rotation_required"), false);
   assert.equal(JSON.stringify(report).includes("password="), false);
+});
+
+test("handoff:check supports colon-delimited Basic Auth credential handoff files", async () => {
+  const outputDir = mkdtempSync(path.join(tmpdir(), "v12-handoff-basic-auth-credential-"));
+  const credentialPath = path.join(outputDir, "admin-credential.txt");
+
+  try {
+    writeFileSync(
+      credentialPath,
+      [
+        "Temporary HTTP staging Basic Auth credential",
+        "username: cad-admin",
+        "password: one-time-secret",
+        "access_mode: http_restricted",
+        "rotation_required: yes",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+    chmodSync(credentialPath, 0o600);
+
+    const inspection = await inspectCredentialFile(credentialPath, "cad-admin");
+    assert.equal(inspection.exists, true);
+    assert.equal(inspection.emailMatches, true);
+    assert.equal(inspection.passwordPresent, true);
+    assert.equal(inspection.rotationRequired, true);
+    if (process.platform !== "win32") {
+      assert.equal(inspection.privatePermissions, true);
+      assert.equal(inspection.mode, "0600");
+    }
+
+    const report = evaluateV12Handoff({
+      adminEmail: "cad-admin",
+      passwordDelivery: "server_file",
+      credentialPath,
+      credentialInspection: inspection,
+    });
+    const checks = new Map(report.checks.map((check) => [check.id, check.ok]));
+    assert.equal(checks.get("admin_credential_email_matches"), true);
+    assert.equal(checks.get("admin_credential_password_present"), true);
+    assert.equal(checks.get("admin_credential_rotation_required"), true);
+    assert.equal(JSON.stringify(report).includes("one-time-secret"), false);
+  } finally {
+    rmSync(outputDir, { recursive: true, force: true });
+  }
 });
 
 function runNode(command: string, args: string[], options: { cwd: string; env?: NodeJS.ProcessEnv }) {

@@ -169,7 +169,7 @@ export function evaluateV12Handoff({
       checks,
       "admin_credential_email_matches",
       credentialRecord.emailMatches === true,
-      "The server-only admin credential file must contain the declared admin email.",
+      "The server-only admin credential file must contain the declared admin identity.",
     );
     add(
       checks,
@@ -496,7 +496,7 @@ async function readJsonIfPresent(filePath) {
   }
 }
 
-async function inspectCredentialFile(filePath, adminEmail) {
+export async function inspectCredentialFile(filePath, adminEmail) {
   try {
     const absolutePath = path.resolve(filePath);
     const fileStat = await stat(absolutePath);
@@ -508,7 +508,7 @@ async function inspectCredentialFile(filePath, adminEmail) {
       checked: true,
       exists: fileStat.isFile(),
       privatePermissions: fileStat.isFile() && (permissions & 0o077) === 0,
-      emailMatches: Boolean(declaredEmail && credential.email === declaredEmail),
+      emailMatches: Boolean(declaredEmail && credential.identity === declaredEmail),
       passwordPresent: credential.passwordPresent === true,
       rotationRequired: credential.rotationRequired === true,
       mode: `0${permissions.toString(8).padStart(3, "0")}`,
@@ -526,13 +526,16 @@ async function inspectCredentialFile(filePath, adminEmail) {
 }
 
 function parseCredentialFile(text) {
-  const parsed = { email: "", passwordPresent: false, rotationRequired: false };
+  const parsed = { identity: "", passwordPresent: false, rotationRequired: false };
   for (const line of String(text || "").split(/\r?\n/)) {
-    const separator = line.indexOf("=");
+    const equalsSeparator = line.indexOf("=");
+    const colonSeparator = line.indexOf(":");
+    const separator =
+      equalsSeparator >= 0 && (colonSeparator < 0 || equalsSeparator < colonSeparator) ? equalsSeparator : colonSeparator;
     if (separator < 0) continue;
     const key = line.slice(0, separator).trim().toLowerCase();
     const value = line.slice(separator + 1).trim();
-    if (key === "email") parsed.email = normalizeEmail(value);
+    if (key === "email" || key === "user" || key === "username") parsed.identity = normalizeEmail(value);
     if (key === "password") parsed.passwordPresent = Boolean(value);
     if (key === "rotation_required") parsed.rotationRequired = value.toLowerCase() === "yes";
   }
