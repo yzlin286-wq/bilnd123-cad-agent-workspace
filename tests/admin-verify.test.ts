@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
+import { updateAdminHandoffEnvFile } from "../scripts/bootstrap-admin.mjs";
 import { evaluateAdminVerification } from "../scripts/verify-admin.mjs";
 
 test("admin verification accepts Clerk admin metadata without exposing secrets", () => {
@@ -95,6 +96,42 @@ test("admin:bootstrap loads Clerk lazily and keeps config failures sanitized", a
   assert.match(result.stderr, /BOOTSTRAP_CONFIG_ERROR/);
   assert.equal(result.stderr.includes("do-not-print-this-password"), false);
   assert.equal(result.stdout.includes("do-not-print-this-password"), false);
+});
+
+test("admin:bootstrap persists safe v1.2 handoff metadata without a password", async () => {
+  const outputDir = mkdtempSync(path.join(tmpdir(), "admin-bootstrap-env-"));
+  const envPath = path.join(outputDir, ".env");
+
+  try {
+    writeFileSync(
+      envPath,
+      "SAAS_ADMIN_EMAILS=owner@example.com\nADMIN_BOOTSTRAP_EMAIL=old@example.com\nV12_ADMIN_PASSWORD_DELIVERY=secure_channel\n",
+      "utf8",
+    );
+
+    await updateAdminHandoffEnvFile(envPath, {
+      adminEmail: "Admin@Example.com",
+      credentialPath: "/opt/bilnd123-cad-agent-workspace/admin-credential.txt",
+    });
+
+    const text = readFileSync(envPath, "utf8");
+    assert.match(text, /SAAS_ADMIN_EMAILS=owner@example.com,admin@example.com/);
+    assert.match(text, /ADMIN_BOOTSTRAP_EMAIL=admin@example.com/);
+    assert.match(text, /V12_ADMIN_EMAIL=admin@example.com/);
+    assert.match(
+      text,
+      /ADMIN_BOOTSTRAP_CREDENTIAL_PATH=\/opt\/bilnd123-cad-agent-workspace\/admin-credential\.txt/,
+    );
+    assert.match(text, /V12_ADMIN_PASSWORD_DELIVERY=server_file/);
+    assert.match(text, /V12_ADMIN_CREDENTIAL_PATH=\/opt\/bilnd123-cad-agent-workspace\/admin-credential\.txt/);
+    assert.equal(text.includes("ADMIN_BOOTSTRAP_PASSWORD"), false);
+    assert.equal(text.includes("do-not-print-this-password"), false);
+    if (process.platform !== "win32") {
+      assert.equal(statSync(envPath).mode & 0o077, 0);
+    }
+  } finally {
+    rmSync(outputDir, { recursive: true, force: true });
+  }
 });
 
 function runNode(command: string, args: string[], options: { cwd: string; env?: NodeJS.ProcessEnv }) {

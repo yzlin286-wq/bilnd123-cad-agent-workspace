@@ -214,7 +214,7 @@ Observation tools:
 
 `npm run staging:protocol -- --execute --output outputs/protocol/latest.json` calls the real staging service and can incur model/API cost. Use it only when the staging access path and authentication are configured. The v1.2 handoff target expects `STAGING_ACCESS_MODE=https`, `STAGING_DOMAIN=<real-domain>`, and `STAGING_HTTPS_ENABLED=1` once a real domain and certificate are active; until then, `http_restricted` must stay firewall-restricted.
 
-Run `npm run admin:bootstrap` inside the `cad-agent` container, or on a host where `npm ci` has already installed dependencies. The command talks to the real Clerk Backend API, writes the optional server-only credential file with `chmod 600`, and never prints the generated password.
+Run `npm run admin:bootstrap` inside the `cad-agent` container, or on a host where `npm ci` has already installed dependencies. The command talks to the real Clerk Backend API, writes the optional server-only credential file with `chmod 600`, persists only safe handoff metadata to `.env` when requested, and never prints the generated password.
 
 For an existing Clerk user, the bootstrap applies `ADMIN_BOOTSTRAP_PASSWORD` by default so the delivered one-time password actually works. Set `ADMIN_BOOTSTRAP_RESET_PASSWORD=0` only when you intentionally do not want to rotate an existing user's password.
 

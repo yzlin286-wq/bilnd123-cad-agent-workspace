@@ -151,8 +151,11 @@ The script:
 - applies the supplied one-time password to new users and, by default, existing users
 - sets Clerk public/private metadata `role=admin`
 - optionally merges the email into `SAAS_ADMIN_EMAILS`
+- optionally persists safe handoff metadata such as `ADMIN_BOOTSTRAP_EMAIL`, `V12_ADMIN_EMAIL`, `V12_ADMIN_PASSWORD_DELIVERY`, and `V12_ADMIN_CREDENTIAL_PATH` when `ADMIN_BOOTSTRAP_ENV_FILE` is set
 - optionally writes the one-time password to a chmod `600` server-only file
 - never prints the password
+
+The `.env` update intentionally stores only non-secret handoff metadata and the credential file path. It must not contain the one-time password; the password belongs only in the server-only credential file or another secure delivery channel.
 
 Set `ADMIN_BOOTSTRAP_RESET_PASSWORD=0` only if the Clerk admin already exists and password rotation is being handled through another secure channel. For v1.2 handoff, leave the default enabled so the delivered initial password can be verified.
 
