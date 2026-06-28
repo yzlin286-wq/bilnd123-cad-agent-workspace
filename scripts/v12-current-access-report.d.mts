@@ -64,3 +64,16 @@ export type CurrentAccessReport = {
 
 export function evaluateCurrentAccessReport(input?: Record<string, unknown>): CurrentAccessReport;
 export function renderCurrentAccessReport(report: CurrentAccessReport): string;
+export function resolveCurrentAccessRuntimeOptions(
+  options?: Record<string, string | undefined>,
+  env?: Record<string, string | undefined>,
+): {
+  baseUrl: string;
+  probeBaseUrl: string;
+  domainUrl: string;
+  ip: string;
+  ipFallback: string;
+  adminUser: string;
+  credentialPath: string;
+  passwordDelivery: string;
+};

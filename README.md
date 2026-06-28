@@ -281,17 +281,20 @@ npm run handoff:check -- --expected-commit "$(git rev-parse --short HEAD)" --out
 For the temporary HTTP + Basic Auth staging posture, generate a current-access report instead of calling the handoff complete:
 
 ```bash
-STAGING_BASE_URL=http://203.0.113.10:12602 \
+STAGING_BASE_URL=http://127.0.0.1:3000 \
+V12_PUBLIC_BASE_URL=http://203.0.113.10:12602 \
+V12_PROBE_BASE_URL=http://127.0.0.1:3000 \
 STAGING_BASIC_AUTH_USER=... \
 STAGING_BASIC_AUTH_PASSWORD=... \
 V12_EXPECTED_IP=203.0.113.10 \
+V12_IP_FALLBACK_URL=http://203.0.113.10:12602 \
 V12_ADMIN_EMAIL=cad-admin \
 V12_ADMIN_PASSWORD_DELIVERY=server_file \
 V12_ADMIN_CREDENTIAL_PATH=/opt/bilnd123-cad-agent-workspace/admin-credential.txt \
 npm run handoff:current-access -- --handoff outputs/reports/v12-handoff-check.json
 ```
 
-The current-access report is for operator handoff of a restricted staging URL only. It explicitly reports `Final v1.2 handoff: not ready` until HTTPS/domain, Clerk, and admin-flow evidence pass the strict gate.
+When running the report inside the container, use `V12_PROBE_BASE_URL` or `--probe-base-url` for the local probe address and `V12_PUBLIC_BASE_URL` or `--base-url` for the real address to show the operator. The current-access report is for operator handoff of a restricted staging URL only. It explicitly reports `Final v1.2 handoff: not ready` until HTTPS/domain, Clerk, and admin-flow evidence pass the strict gate.
 
 Then generate the sanitized handoff report:
 

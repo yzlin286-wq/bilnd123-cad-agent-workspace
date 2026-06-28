@@ -187,27 +187,22 @@ export function renderCurrentAccessReport(report) {
 
 async function main() {
   const options = parseArgs(process.argv.slice(2));
-  const baseUrl = options.baseUrl || process.env.STAGING_BASE_URL;
-  const domainUrl = options.domainUrl || domainUrlFromEnv(process.env.STAGING_DOMAIN);
-  const ip = options.ip || process.env.V12_EXPECTED_IP;
-  const ipFallback = options.ipFallback || process.env.V12_IP_FALLBACK_URL || baseUrl;
-  const adminUser = options.adminUser || process.env.V12_ADMIN_EMAIL || process.env.STAGING_BASIC_AUTH_USER;
-  const credentialPath = options.credentialPath || process.env.V12_ADMIN_CREDENTIAL_PATH || process.env.ADMIN_BOOTSTRAP_CREDENTIAL_PATH;
-  const passwordDelivery = options.passwordDelivery || process.env.V12_ADMIN_PASSWORD_DELIVERY || process.env.ADMIN_BOOTSTRAP_PASSWORD_DELIVERY;
+  const runtime = resolveCurrentAccessRuntimeOptions(options, process.env);
   const authHeader = basicAuthHeader(process.env.STAGING_BASIC_AUTH_USER, process.env.STAGING_BASIC_AUTH_PASSWORD);
-  const healthUnauth = baseUrl ? await requestJson(new URL("/api/health", baseUrl), {}) : {};
-  const healthAuth = baseUrl ? await requestJson(new URL("/api/health", baseUrl), authHeader ? { authorization: authHeader } : {}) : {};
-  const adminResponse = baseUrl ? await requestText(new URL("/admin", baseUrl), authHeader ? { authorization: authHeader } : {}) : {};
-  const appResponse = baseUrl ? await requestText(new URL("/app", baseUrl), authHeader ? { authorization: authHeader } : {}) : {};
+  const probeBaseUrl = runtime.probeBaseUrl;
+  const healthUnauth = probeBaseUrl ? await requestJson(new URL("/api/health", probeBaseUrl), {}) : {};
+  const healthAuth = probeBaseUrl ? await requestJson(new URL("/api/health", probeBaseUrl), authHeader ? { authorization: authHeader } : {}) : {};
+  const adminResponse = probeBaseUrl ? await requestText(new URL("/admin", probeBaseUrl), authHeader ? { authorization: authHeader } : {}) : {};
+  const appResponse = probeBaseUrl ? await requestText(new URL("/app", probeBaseUrl), authHeader ? { authorization: authHeader } : {}) : {};
   const handoff = options.handoff ? await readJsonIfPresent(options.handoff) : undefined;
   const report = evaluateCurrentAccessReport({
-    baseUrl,
-    domainUrl,
-    ip,
-    ipFallback,
-    adminUser,
-    passwordDelivery,
-    credentialPath,
+    baseUrl: runtime.baseUrl,
+    domainUrl: runtime.domainUrl,
+    ip: runtime.ip,
+    ipFallback: runtime.ipFallback,
+    adminUser: runtime.adminUser,
+    passwordDelivery: runtime.passwordDelivery,
+    credentialPath: runtime.credentialPath,
     healthUnauthStatus: healthUnauth.status,
     healthStatus: healthAuth.status,
     health: healthAuth.body,
@@ -221,6 +216,22 @@ async function main() {
   await writeText(json, `${JSON.stringify(report, null, 2)}\n`);
   console.log(JSON.stringify({ ok: report.ok, handoffReady: report.v12Handoff.ready, output, json }));
   process.exitCode = report.ok ? 0 : 1;
+}
+
+export function resolveCurrentAccessRuntimeOptions(options = {}, env = {}) {
+  const baseUrl =
+    options.baseUrl || env.V12_PUBLIC_BASE_URL || env.STAGING_PUBLIC_BASE_URL || env.STAGING_BASE_URL || "";
+  const probeBaseUrl = options.probeBaseUrl || env.V12_PROBE_BASE_URL || env.STAGING_PROBE_BASE_URL || baseUrl;
+  return {
+    baseUrl,
+    probeBaseUrl,
+    domainUrl: options.domainUrl || domainUrlFromEnv(env.STAGING_DOMAIN),
+    ip: options.ip || env.V12_EXPECTED_IP || "",
+    ipFallback: options.ipFallback || env.V12_IP_FALLBACK_URL || baseUrl,
+    adminUser: options.adminUser || env.V12_ADMIN_EMAIL || env.STAGING_BASIC_AUTH_USER || "",
+    credentialPath: options.credentialPath || env.V12_ADMIN_CREDENTIAL_PATH || env.ADMIN_BOOTSTRAP_CREDENTIAL_PATH || "",
+    passwordDelivery: options.passwordDelivery || env.V12_ADMIN_PASSWORD_DELIVERY || env.ADMIN_BOOTSTRAP_PASSWORD_DELIVERY || "",
+  };
 }
 
 async function requestJson(url, headers) {
@@ -272,6 +283,7 @@ function parseArgs(args) {
     else if (arg === "--domain-url") options.domainUrl = args[++index];
     else if (arg === "--ip") options.ip = args[++index];
     else if (arg === "--ip-fallback") options.ipFallback = args[++index];
+    else if (arg === "--probe-base-url") options.probeBaseUrl = args[++index];
     else if (arg === "--admin-user") options.adminUser = args[++index];
     else if (arg === "--password-delivery") options.passwordDelivery = args[++index];
     else if (arg === "--credential-path") options.credentialPath = args[++index];

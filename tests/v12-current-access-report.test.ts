@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { evaluateCurrentAccessReport, renderCurrentAccessReport } from "../scripts/v12-current-access-report.mjs";
+import {
+  evaluateCurrentAccessReport,
+  renderCurrentAccessReport,
+  resolveCurrentAccessRuntimeOptions,
+} from "../scripts/v12-current-access-report.mjs";
 
 test("current access report accepts temporary HTTP Basic Auth access but rejects final handoff", () => {
   const report = evaluateCurrentAccessReport({
@@ -83,4 +87,27 @@ test("current access report redacts credentials and secret-like values", () => {
   assert.equal(markdown.includes("should-not-leak"), false);
   assert.equal(markdown.includes("/opt/secret"), false);
   assert.match(markdown, /secure one-time channel/);
+});
+
+test("current access report separates public URL from private probe URL", () => {
+  const resolved = resolveCurrentAccessRuntimeOptions(
+    {
+      baseUrl: "http://43.138.153.37:12602",
+      probeBaseUrl: "http://127.0.0.1:3000",
+      ip: "43.138.153.37",
+    },
+    {
+      STAGING_BASE_URL: "http://127.0.0.1:3000",
+      STAGING_BASIC_AUTH_USER: "cad-admin",
+      V12_ADMIN_PASSWORD_DELIVERY: "server_file",
+      V12_ADMIN_CREDENTIAL_PATH: "/opt/bilnd123-cad-agent-workspace/admin-credential.txt",
+    },
+  );
+
+  assert.equal(resolved.baseUrl, "http://43.138.153.37:12602");
+  assert.equal(resolved.probeBaseUrl, "http://127.0.0.1:3000");
+  assert.equal(resolved.ipFallback, "http://43.138.153.37:12602");
+  assert.equal(resolved.ip, "43.138.153.37");
+  assert.equal(resolved.adminUser, "cad-admin");
+  assert.equal(resolved.passwordDelivery, "server_file");
 });
