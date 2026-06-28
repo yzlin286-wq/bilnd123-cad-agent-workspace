@@ -144,6 +144,7 @@ npm run runs:summary
 npm run failures:export
 npm run staging:report
 npm run staging:protocol
+npm run handoff:preflight
 npm run handoff:check
 npm run release:check
 ```
@@ -199,6 +200,7 @@ Observation tools:
 - `npm run staging:protocol`: dry-run the 20-prompt internal trial protocol at `outputs/protocol/latest.json`
 - `npm run admin:verify`: verify the declared Clerk admin exists, has password login, and is authorized as admin
 - `npm run admin:flow:verify`: verify sanitized evidence for admin login, `/admin`, project create, package download, and cross-owner artifact denial
+- `npm run handoff:preflight`: render the private v1.2 access handoff status in the requested Access/Admin format
 - `npm run handoff:check`: strict v1.2 SaaS access handoff gate for HTTPS, Clerk, Postgres, and admin credential delivery
 - `npm run handoff:report`: render a sanitized v1.2 handoff report from `outputs/reports/v12-handoff-check.json`
 
@@ -264,9 +266,10 @@ Then generate the sanitized handoff report:
 
 ```bash
 npm run handoff:report -- --input outputs/reports/v12-handoff-check.json --output outputs/reports/v12-handoff-report.md
+npm run handoff:preflight -- --handoff outputs/reports/v12-handoff-check.json --output outputs/reports/v12-access-preflight.md --json outputs/reports/v12-access-preflight.json
 ```
 
-This check intentionally fails for the temporary HTTP + Basic Auth staging posture. It verifies that the HTTPS URL uses a real domain, the domain resolves to `V12_EXPECTED_IP`, HTTP redirects to HTTPS, the optional IP fallback remains Basic Auth protected, the declared Clerk admin exists and is authorized, and the real Clerk admin flow has been verified. It must not be used to claim handoff completion until it passes against the real HTTPS/Clerk deployment. When `V12_ADMIN_PASSWORD_DELIVERY=server_file`, run the check on the staging host so it can verify the credential file exists and is not readable by group/world users. Use `V12_ADMIN_PASSWORD_DELIVERY=secure_channel` only when the password was delivered out of band.
+This check intentionally fails for the temporary HTTP + Basic Auth staging posture. It verifies that the HTTPS URL uses a real domain, the domain resolves to `V12_EXPECTED_IP`, HTTP redirects to HTTPS, the optional IP fallback remains Basic Auth protected, the declared Clerk admin exists and is authorized, and the real Clerk admin flow has been verified. It must not be used to claim handoff completion until it passes against the real HTTPS/Clerk deployment. `handoff:preflight` is the private report formatter for the requested Access/Admin handoff fields; it says `Status: not ready` until the strict gate passes. When `V12_ADMIN_PASSWORD_DELIVERY=server_file`, run the check on the staging host so it can verify the credential file exists and is not readable by group/world users. Use `V12_ADMIN_PASSWORD_DELIVERY=secure_channel` only when the password was delivered out of band.
 
 Dev fallback persistence and feedback files live in the staging log volume only when `DATABASE_URL` is absent:
 

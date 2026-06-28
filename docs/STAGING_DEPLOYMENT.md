@@ -270,7 +270,28 @@ Generate the sanitized access handoff report from the check output:
 
 ```bash
 npm run handoff:report -- --input outputs/reports/v12-handoff-check.json --output outputs/reports/v12-handoff-report.md
+npm run handoff:preflight -- --handoff outputs/reports/v12-handoff-check.json --output outputs/reports/v12-access-preflight.md --json outputs/reports/v12-access-preflight.json
 ```
+
+`handoff:preflight` renders the private delivery format requested for v1.2:
+
+```text
+Access
+- Domain: https://...
+- IP: ...
+- IP fallback: ...
+- accessMode: https
+- HTTPS: enabled
+- Health: app ok, runner true, llm true, output writable true
+
+Admin
+- Admin email: ...
+- Admin password: server-only file ... / secure one-time channel
+- Password rotation required: yes
+- /admin verified: yes
+```
+
+It reports `Status: not ready` and lists blockers until the strict handoff gate proves the real HTTPS domain, Clerk admin flow, artifact authorization, and Postgres data layer.
 
 The gate verifies:
 

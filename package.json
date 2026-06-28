@@ -11,6 +11,7 @@
     "admin:verify": "node scripts/verify-admin.mjs",
     "db:migrate": "node scripts/migrate-postgres.mjs",
     "failures:export": "node scripts/export-failures.mjs",
+    "handoff:preflight": "node scripts/v12-access-preflight.mjs",
     "handoff:check": "node scripts/v12-handoff-check.mjs",
     "handoff:report": "node scripts/v12-handoff-report.mjs",
     "start": "next start",
