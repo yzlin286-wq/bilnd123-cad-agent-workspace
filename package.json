@@ -11,6 +11,7 @@
     "admin:verify": "node scripts/verify-admin.mjs",
     "db:migrate": "node scripts/migrate-postgres.mjs",
     "failures:export": "node scripts/export-failures.mjs",
+    "handoff:current-access": "node scripts/v12-current-access-report.mjs",
     "handoff:domain:check": "node scripts/v12-domain-tls-check.mjs",
     "handoff:env:audit": "node scripts/v12-env-audit.mjs",
     "handoff:preflight": "node scripts/v12-access-preflight.mjs",

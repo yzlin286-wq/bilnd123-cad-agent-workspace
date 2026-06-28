@@ -144,6 +144,7 @@ npm run runs:summary
 npm run failures:export
 npm run staging:report
 npm run staging:protocol
+npm run handoff:current-access
 npm run handoff:domain:check
 npm run handoff:env:audit
 npm run handoff:preflight
@@ -202,6 +203,7 @@ Observation tools:
 - `npm run staging:protocol`: dry-run the 20-prompt internal trial protocol at `outputs/protocol/latest.json`
 - `npm run admin:verify`: verify the declared Clerk admin exists, has password login, and is authorized as admin
 - `npm run admin:flow:verify`: verify sanitized evidence for admin login, `/admin`, project create, package download, and cross-owner artifact denial
+- `npm run handoff:current-access`: render the current temporary access report without printing passwords
 - `npm run handoff:domain:check`: verify DNS, HTTP to HTTPS redirect, HTTPS `/api/health`, and optional IP fallback
 - `npm run handoff:env:audit`: audit the server-only `.env` and admin credential file permissions without printing secrets
 - `npm run handoff:preflight`: render the private v1.2 access handoff status in the requested Access/Admin format
@@ -268,6 +270,21 @@ V12_ADMIN_VERIFY_PATH=outputs/reports/v12-admin-verify.json \
 V12_ADMIN_FLOW_EVIDENCE_PATH=outputs/reports/v12-admin-flow-evidence.json \
 npm run handoff:check -- --output outputs/reports/v12-handoff-check.json
 ```
+
+For the temporary HTTP + Basic Auth staging posture, generate a current-access report instead of calling the handoff complete:
+
+```bash
+STAGING_BASE_URL=http://203.0.113.10:12602 \
+STAGING_BASIC_AUTH_USER=... \
+STAGING_BASIC_AUTH_PASSWORD=... \
+V12_EXPECTED_IP=203.0.113.10 \
+V12_ADMIN_EMAIL=cad-admin \
+V12_ADMIN_PASSWORD_DELIVERY=server_file \
+V12_ADMIN_CREDENTIAL_PATH=/opt/bilnd123-cad-agent-workspace/admin-credential.txt \
+npm run handoff:current-access -- --handoff outputs/reports/v12-handoff-check.json
+```
+
+The current-access report is for operator handoff of a restricted staging URL only. It explicitly reports `Final v1.2 handoff: not ready` until HTTPS/domain, Clerk, and admin-flow evidence pass the strict gate.
 
 Then generate the sanitized handoff report:
 
