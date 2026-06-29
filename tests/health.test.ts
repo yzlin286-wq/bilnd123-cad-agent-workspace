@@ -38,16 +38,23 @@ test("authPosture reports safe booleans without exposing secret values", () => {
       stagingBasicAuthPassword: "basic-secret",
       devBypass: "0",
       adminEmails: "admin@example.com",
+      appAuthUser: "cad-admin",
+      appAuthPassword: "app-secret",
+      appAuthSessionSecret: "x".repeat(48),
     }),
     {
+      provider: "local_password",
       clerkConfigured: true,
+      localPasswordConfigured: true,
       basicAuthConfigured: true,
       devBypassEnabled: false,
       adminAllowlistConfigured: true,
     },
   );
   assert.deepEqual(authPosture({ devBypass: "1" }), {
+    provider: "local_password",
     clerkConfigured: false,
+    localPasswordConfigured: false,
     basicAuthConfigured: false,
     devBypassEnabled: true,
     adminAllowlistConfigured: false,

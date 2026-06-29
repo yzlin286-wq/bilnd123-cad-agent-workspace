@@ -2,17 +2,18 @@
 
 ## Route Protection
 
-- `/app/*`: requires a SaaS identity, meaning a signed-in Clerk user or explicit local `SAAS_DEV_AUTH_BYPASS=1`.
+- `/app/*`: requires an application identity, meaning a signed local password session, a signed-in Clerk user when `SAAS_AUTH_PROVIDER=clerk`, or explicit local `SAAS_DEV_AUTH_BYPASS=1`.
 - `/admin`: requires a SaaS identity and admin status.
 - Staging may also use Basic Auth as an outer access gate.
 - Basic Auth is not a SaaS user identity. It only lets the request reach the app.
 
 Admin status can come from:
 
-- Clerk organization role: `admin`, `org:admin`, or `owner`
+- Local password login issued from `APP_AUTH_USER` / `APP_AUTH_PASSWORD`
+- Clerk organization role: `admin`, `org:admin`, or `owner` when Clerk is explicitly enabled
 - `SAAS_ADMIN_USER_IDS`
 - `SAAS_ADMIN_EMAILS`
-- Clerk user metadata `role=admin`, set by `npm run admin:bootstrap`
+- Clerk user metadata `role=admin`, set by `npm run admin:bootstrap` when Clerk is explicitly enabled
 
 ## Project Ownership
 
@@ -43,4 +44,4 @@ The route must never expose local server paths.
 
 ## Current Caveat
 
-Temporary HTTP staging can still use Basic Auth for health checks and smoke/API validation, but interactive `/app` and `/admin` access must not treat Basic Auth as a signed-in SaaS user. A v1.2 access handoff must verify real Clerk login, non-admin `/admin` denial, project ownership, and artifact `401`/`403` behavior.
+Temporary HTTP staging can still use Basic Auth for health checks and smoke/API validation, but interactive `/app` and `/admin` access must not treat Basic Auth as a signed-in app user. Current staging uses local password login by default. If Clerk is explicitly re-enabled later, the handoff must verify real Clerk login, non-admin `/admin` denial, project ownership, and artifact `401`/`403` behavior.

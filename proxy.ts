@@ -56,7 +56,7 @@ function stagingBasicAuthState(request: NextRequest) {
 }
 
 export function proxyMode(env: Record<string, string | undefined> = process.env): "clerk" | "fallback" {
-  return isClerkConfiguredForProxy(env) ? "clerk" : "fallback";
+  return env.SAAS_AUTH_PROVIDER === "clerk" && isClerkConfiguredForProxy(env) ? "clerk" : "fallback";
 }
 
 function isClerkConfiguredForProxy(env: Record<string, string | undefined> = process.env) {

@@ -71,9 +71,15 @@ export function authPosture({
   devBypass = process.env.SAAS_DEV_AUTH_BYPASS,
   adminUserIds = process.env.SAAS_ADMIN_USER_IDS,
   adminEmails = process.env.SAAS_ADMIN_EMAILS,
+  appAuthUser = process.env.APP_AUTH_USER,
+  appAuthPassword = process.env.APP_AUTH_PASSWORD,
+  appAuthSessionSecret = process.env.APP_AUTH_SESSION_SECRET,
+  authProvider = process.env.SAAS_AUTH_PROVIDER,
 } = {}) {
   return {
+    provider: authProvider === "clerk" ? "clerk" : "local_password",
     clerkConfigured: Boolean(clerkSecretKey?.trim() && clerkPublishableKey?.trim()),
+    localPasswordConfigured: Boolean(appAuthUser?.trim() && appAuthPassword?.trim() && (appAuthSessionSecret?.length || 0) >= 32),
     basicAuthConfigured: Boolean(stagingBasicAuthUser?.trim() && stagingBasicAuthPassword?.trim()),
     devBypassEnabled: devBypass === "1",
     adminAllowlistConfigured: Boolean(adminUserIds?.trim() || adminEmails?.trim()),

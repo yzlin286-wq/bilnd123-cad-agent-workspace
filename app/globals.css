@@ -110,12 +110,23 @@ textarea {
 .user-menu-fallback {
   display: inline-flex;
   align-items: center;
+  gap: 10px;
   min-height: 38px;
   border: 1px solid var(--line);
   border-radius: 999px;
   padding: 0 12px;
   background: rgba(15, 23, 42, 0.44);
   color: var(--muted);
+  font-size: 12px;
+  font-weight: 760;
+}
+
+.user-menu button {
+  border: 0;
+  border-left: 1px solid var(--line);
+  padding: 0 0 0 10px;
+  background: transparent;
+  color: var(--text);
   font-size: 12px;
   font-weight: 760;
 }
@@ -1109,6 +1120,79 @@ textarea {
 .access-panel p {
   color: var(--muted);
   line-height: 1.6;
+}
+
+.auth-form {
+  display: grid;
+  gap: 14px;
+  margin-top: 22px;
+}
+
+.auth-form label {
+  display: grid;
+  gap: 7px;
+}
+
+.auth-form label span {
+  color: var(--faint);
+  font-size: 12px;
+  font-weight: 760;
+  text-transform: uppercase;
+}
+
+.auth-form input {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  min-height: 44px;
+  padding: 0 13px;
+  background: rgba(3, 7, 18, 0.72);
+  color: var(--text);
+  outline: none;
+}
+
+.auth-form button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(45, 212, 191, 0.48);
+  border-radius: 999px;
+  min-height: 44px;
+  padding: 0 16px;
+  background: linear-gradient(135deg, #2dd4bf, #60a5fa);
+  color: #02111c;
+  font-weight: 780;
+}
+
+.auth-form button:disabled,
+.auth-form input:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.auth-error,
+.auth-warning {
+  border-radius: 14px;
+  padding: 11px 12px;
+}
+
+.auth-error {
+  border: 1px solid rgba(251, 113, 133, 0.38);
+  background: rgba(251, 113, 133, 0.12);
+  color: #fecdd3 !important;
+}
+
+.auth-warning {
+  border: 1px solid rgba(248, 195, 91, 0.42);
+  background: rgba(248, 195, 91, 0.1);
+  color: #fde68a !important;
+}
+
+.auth-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 18px;
 }
 
 .saas-shell {

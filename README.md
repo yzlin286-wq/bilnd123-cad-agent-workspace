@@ -4,7 +4,7 @@ AI CAD Agent workspace built with Next.js, React, Three.js, and build123d.
 
 The product surface is intentionally user-facing: users start with natural language, then watch an agent workstream create an engineering spec, run the CAD kernel, validate geometry, and expose real artifacts for preview and download.
 
-Current stage: `v1.2 SaaS access handoff`.
+Current stage: `v1.2 local password staging access`.
 
 ## Product Shape
 
@@ -19,7 +19,7 @@ Current stage: `v1.2 SaaS access handoff`.
 - Trial feedback captures thumbs up/down and optional comments without user accounts
 - `/admin` provides an admin-only alpha usage dashboard
 - `/app` provides a protected SaaS dashboard with template cards, recent projects, recent artifacts, usage, and alpha health
-- Clerk is the preferred SaaS auth provider; Basic Auth is only a staging access gate when Clerk is configured
+- Local username/password login is the current application identity layer; Basic Auth remains only the outer staging gate
 - Postgres is the staging SaaS data layer when `DATABASE_URL` is set; JSON remains a dev fallback
 
 Not currently supported:
@@ -31,10 +31,11 @@ Not currently supported:
 - Public anonymous production traffic
 - Payment, tenancy, BOM, or RFQ flows
 
-SaaS access handoff status:
+Access status:
 
-- Auth: Clerk scaffold is implemented. When Clerk keys are configured, Basic Auth no longer acts as a SaaS identity.
-- Admin bootstrap: `npm run admin:bootstrap` creates or updates a Clerk admin user without printing the password.
+- Auth: `/sign-in` uses server-side `APP_AUTH_USER`, `APP_AUTH_PASSWORD`, and `APP_AUTH_SESSION_SECRET` to issue a signed httpOnly session cookie.
+- Basic Auth: still required as the outer restricted staging gate; it is not accepted as an app user identity.
+- Clerk: optional legacy handoff tooling remains in scripts, but the app defaults to `SAAS_AUTH_PROVIDER=local_password` and will not switch to Clerk unless explicitly configured.
 - Data: `db/schema.sql` defines the Postgres schema and the runtime adapter uses Postgres when `DATABASE_URL` is configured.
 - Authorization: artifacts are checked against project/revision ownership before download.
 - HTTPS/domain: `docker-compose.staging.https.yml` and Caddy config are provided, but a real domain/DNS setup is still required before claiming HTTPS access.
@@ -107,6 +108,11 @@ CAD_MAX_CONCURRENT_RUNS=1
 STAGING_ACCESS_MODE=unknown
 STAGING_HTTPS_ENABLED=0
 APP_COMMIT_SHA=
+SAAS_AUTH_PROVIDER=local_password
+APP_AUTH_USER=replace-with-app-login-user
+APP_AUTH_PASSWORD=replace-with-strong-app-login-password
+APP_AUTH_SESSION_SECRET=replace-with-at-least-32-character-session-secret
+APP_AUTH_EMAIL=operator@example.com
 CLERK_SECRET_KEY=
 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=
 DATABASE_URL=
@@ -117,7 +123,7 @@ CAD_OUTPUT_RETENTION_HOURS=72
 CAD_OUTPUT_MAX_BYTES=1073741824
 ```
 
-For Docker staging, `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` is also a build-time value for the Next.js client bundle. After adding or rotating Clerk publishable keys, rebuild the image with the compose `--env-file .env up -d --build` flow; a container restart alone is not enough.
+For Docker staging, app password credentials are server-only runtime values. Do not prefix them with `NEXT_PUBLIC_`, do not commit them, and keep the server `.env` at `chmod 600`.
 
 For local build123d validation on Windows:
 
@@ -194,7 +200,7 @@ Legacy diagnostic endpoints may remain for development, but the user-facing app 
 - HTTPS compose example: `docker-compose.staging.https.yml`
 - Manual smoke: `npm run smoke:staging -- --output outputs/smoke/latest.json`
 
-Staging must be protected and is not suitable for public anonymous traffic. Basic Auth may remain as an outer staging gate, but Clerk is the SaaS identity layer once configured. Basic Auth should not be used long-term over plaintext HTTP; use HTTPS, a private tunnel, Tailscale, or IP allowlist before broader internal testing.
+Staging must be protected and is not suitable for public anonymous traffic. Basic Auth may remain as an outer staging gate, while the app identity layer is the local password session. Basic Auth should not be used long-term over plaintext HTTP; use HTTPS, a private tunnel, Tailscale, or IP allowlist before broader internal testing.
 
 Observation tools:
 
@@ -204,7 +210,7 @@ Observation tools:
 - `npm run staging:report`: generate a local sanitized report at `outputs/reports/staging-report.md`
 - `npm run staging:protocol`: dry-run the 20-prompt internal trial protocol at `outputs/protocol/latest.json`
 - `npm run staging:rotate-basic-auth`: rotate the temporary staging Basic Auth gate and server-only credential file without printing the password
-- `npm run admin:verify`: verify the declared Clerk admin exists, has password login, and is authorized as admin
+- `npm run admin:verify`: legacy Clerk handoff verifier; not required for the current local-password staging path
 - `npm run admin:flow:verify`: verify sanitized evidence for admin login, `/admin`, project create, package download, and cross-owner artifact denial
 - `npm run handoff:current-access`: render the current temporary access report without printing passwords
 - `npm run handoff:domain:check`: verify DNS, HTTP to HTTPS redirect, HTTPS `/api/health`, and optional IP fallback

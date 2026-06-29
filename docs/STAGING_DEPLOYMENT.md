@@ -44,6 +44,11 @@ APP_COMMIT_SHA=
 CLERK_SECRET_KEY=replace-with-real-clerk-secret-key
 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=replace-with-real-clerk-publishable-key
 SAAS_ADMIN_EMAILS=admin@example.com
+SAAS_AUTH_PROVIDER=local_password
+APP_AUTH_USER=replace-with-app-login-user
+APP_AUTH_PASSWORD=replace-with-strong-app-login-password
+APP_AUTH_SESSION_SECRET=replace-with-at-least-32-character-session-secret
+APP_AUTH_EMAIL=operator@example.com
 
 POSTGRES_USER=cad_agent
 POSTGRES_PASSWORD=replace-with-strong-postgres-password
@@ -58,7 +63,7 @@ CAD_OUTPUT_MAX_BYTES=1073741824
 
 Never prefix model keys with `NEXT_PUBLIC_`. Browser code must not receive `CAD_AGENT_API_KEY`.
 
-`NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` is public but must be available during `next build` so the Clerk client bundle can initialize. The staging compose files pass it as a Docker build arg. After adding or rotating Clerk keys, rebuild the image with `--env-file .env up -d --build`; do not rely on a container restart alone.
+The local password values are server-only runtime settings. Do not prefix them with `NEXT_PUBLIC_`, and keep `.env` at `chmod 600`. Clerk keys are optional legacy handoff values and are ignored unless `SAAS_AUTH_PROVIDER=clerk`.
 
 Set `APP_COMMIT_SHA` to the deployed commit before building, for example `APP_COMMIT_SHA=$(git rev-parse --short HEAD)`. `/api/health`, staging smoke, and v1.2 handoff reports expose only this sanitized commit value so the verified deployment can be tied back to a Git commit.
 
@@ -117,7 +122,7 @@ STAGING_BASIC_AUTH_PASSWORD=...
 
 When both are set, the staging access gate protects the app and APIs. Unauthenticated requests return `401`.
 
-When Clerk is configured, Basic Auth is only an outer staging gate. It does not create a SaaS user session. `/app`, `/admin`, project APIs, and artifact downloads still require a Clerk-authenticated user.
+Basic Auth is only an outer staging gate. It does not create an application user session. `/app`, `/admin`, project APIs, and artifact downloads still require the local password session by default.
 
 Do not run Basic Auth over long-lived plaintext HTTP. Use HTTPS before inviting internal testers beyond a brief private smoke check.
 
@@ -130,9 +135,32 @@ Do not run Basic Auth over long-lived plaintext HTTP. Use HTTPS before inviting 
 
 Do not put server IPs, tester IPs, passwords, API keys, Cloudflare tokens, or certificate material into committed files.
 
-## Clerk Admin Bootstrap
+## Local Password Login
 
-Run the bootstrap from the `cad-agent` container, or from a server shell where `npm ci` has already installed dependencies, with real Clerk keys in the process environment. Do not paste the password into git, README, issue trackers, or shell scripts.
+Set these server-only values before rebuilding or restarting staging:
+
+```bash
+SAAS_AUTH_PROVIDER=local_password
+APP_AUTH_USER=cad-admin
+APP_AUTH_PASSWORD=replace-with-strong-password
+APP_AUTH_SESSION_SECRET=replace-with-at-least-32-character-secret
+APP_AUTH_EMAIL=operator@example.com
+APP_AUTH_COOKIE_SECURE=0
+```
+
+Use `APP_AUTH_COOKIE_SECURE=1` only when staging is actually served over HTTPS. Current HTTP-restricted staging must leave it at `0` or the browser will not store the session cookie.
+
+Required verification:
+
+- unauthenticated `/app` is redirected to sign-in or blocked by Basic Auth
+- signing in with the local username/password opens `/app`
+- the signed-in local admin can open `/admin`
+- Basic Auth alone does not create a project API identity
+- artifact and package downloads still require the outer Basic Auth gate and project authorization
+
+## Clerk Admin Bootstrap (Legacy Optional)
+
+Run this only if you explicitly switch back to `SAAS_AUTH_PROVIDER=clerk`. Do not paste the password into git, README, issue trackers, or shell scripts.
 
 ```bash
 ADMIN_BOOTSTRAP_EMAIL=admin@example.com \

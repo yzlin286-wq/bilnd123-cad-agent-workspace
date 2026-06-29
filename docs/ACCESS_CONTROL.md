@@ -6,7 +6,7 @@ Do not commit real IP addresses, tester CIDRs, passwords, API keys, tunnel token
 
 ## v1.2 Handoff Target
 
-For v1.2, the preferred handoff is a real HTTPS domain with Clerk login and Postgres persistence. The earlier IP allowlist approach remains acceptable only as an interim restricted fallback until DNS and certificate issuance are complete.
+For v1.2, the current handoff is a restricted staging URL with local username/password login and Postgres persistence. A real HTTPS domain is still preferred before broader internal use. The IP allowlist approach remains acceptable as an interim restricted fallback until DNS and certificate issuance are complete.
 
 Store the real allowlist only in the cloud firewall, host firewall, or server-only operations notes. Do not commit real tester IPs or CIDRs.
 
@@ -21,8 +21,8 @@ STAGING_ACCESS_MODE=http_restricted
 - App-level Basic Auth must stay enabled for staging.
 - `/api/artifacts/[id]` is protected by the same Basic Auth proxy as `/api/health`, `/api/agent/run`, `/api/agent/revise`, and `/api/cad/rebuild`.
 - `/admin`, `/api/projects`, and `/api/feedback` are protected by the same Basic Auth proxy.
-- When Clerk keys are configured, `/app/*` and `/admin` require Clerk auth. Basic Auth alone is not a signed-in user.
-- `/admin` requires admin allowlist or organization admin status after sign-in.
+- `/app/*` and `/admin` require the local password session by default. Basic Auth alone is not a signed-in user.
+- `/admin` requires admin status after sign-in; the local password user is the staging admin.
 - Artifact downloads check project/revision ownership after auth; Basic Auth alone is not the artifact authorization model.
 - Plain HTTP plus Basic Auth is acceptable only for a short operator smoke on a restricted network path.
 - Before a 48-72 hour internal trial, use HTTPS, a private network, an authenticated tunnel, or a cloud firewall allowlist.
@@ -97,7 +97,7 @@ Run these checks after applying the allowlist and restarting the app:
 - Confirm authenticated `/api/health` returns `httpsConfigured: true`.
 - Set `STAGING_ACCESS_MODE=https`.
 - Set `STAGING_DOMAIN` to the real domain and `STAGING_HTTPS_ENABLED=1`.
-- Confirm real Clerk sign-in works.
+- Confirm local username/password sign-in works.
 - Confirm `dataLayer.mode: "postgres"` and `dataLayer.productionReady: true`.
 - Confirm unauthenticated `/app` is blocked or redirected to sign-in.
 - Confirm non-admin signed-in users cannot access `/admin`.

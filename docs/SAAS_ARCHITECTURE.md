@@ -1,6 +1,6 @@
 # SaaS Architecture
 
-Current stage: `v1.2 SaaS access handoff`.
+Current stage: `v1.2 local password staging access`.
 
 ## Scope
 
@@ -20,22 +20,35 @@ Not supported in this stage:
 
 ## Auth
 
-Clerk is the preferred SaaS auth and organization provider.
+The current staging identity layer is a local username/password login backed by a signed httpOnly cookie. Basic Auth remains the outer staging gate only.
 
-Required environment variables when Clerk is enabled:
+Required environment variables:
 
 ```bash
+SAAS_AUTH_PROVIDER=local_password
+APP_AUTH_USER=
+APP_AUTH_PASSWORD=
+APP_AUTH_SESSION_SECRET=
+APP_AUTH_EMAIL=
+```
+
+`APP_AUTH_SESSION_SECRET` must be at least 32 characters and must stay server-only.
+
+Clerk handoff tooling remains available only when explicitly enabled:
+
+```bash
+SAAS_AUTH_PROVIDER=clerk
 CLERK_SECRET_KEY=
 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=
 SAAS_ADMIN_USER_IDS=
 SAAS_ADMIN_EMAILS=
 ```
 
-When Clerk is configured, `/app` and `/admin` are protected by Clerk middleware. `/admin` also checks an admin allowlist or organization admin role.
+By default, `/app` and `/admin` require the local password session. `/admin` treats the local password user as the staging administrator.
 
-When Clerk is configured, Basic Auth is only an outer staging gate. It must not be treated as the SaaS identity for `/app`, `/admin`, or artifact authorization.
+Basic Auth is only an outer staging gate. It must not be treated as the application identity for `/app`, `/admin`, project APIs, or artifact authorization.
 
-When Clerk is not configured, staging can continue using Basic Auth as a temporary internal fallback. This fallback is not a production SaaS auth replacement and must be reported as incomplete SaaS login.
+When `SAAS_AUTH_PROVIDER=clerk`, Clerk can protect `/app` and `/admin`; this is no longer the default staging path.
 
 Admin bootstrap runs from the `cad-agent` container, or from a host shell after `npm ci` has installed dependencies:
 

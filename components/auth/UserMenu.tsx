@@ -1,28 +1,13 @@
-"use client";
-
 import Link from "next/link";
-import { UserButton, useUser } from "@clerk/nextjs";
+import { appRouteAccess, getPageAuthContext } from "@/lib/server/auth";
 
-export function UserMenu() {
-  if (!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY) {
-    return <span className="user-menu-fallback">Internal auth</span>;
-  }
-  return <ClerkUserMenu />;
-}
-
-function ClerkUserMenu() {
-  const { isSignedIn, isLoaded } = useUser();
-  if (!isLoaded) return <span className="user-menu-fallback">Loading</span>;
-  if (!isSignedIn) {
-    return (
-      <div className="user-menu">
-        <Link href="/sign-in">Sign in</Link>
-      </div>
-    );
-  }
+export async function UserMenu() {
+  const auth = await getPageAuthContext();
+  if (appRouteAccess(auth) !== "allow") return null;
   return (
-    <div className="user-menu">
-      <UserButton />
-    </div>
+    <form className="user-menu" method="post" action="/api/auth/logout">
+      <Link href="/app">{auth.email || "Internal account"}</Link>
+      <button type="submit">Sign out</button>
+    </form>
   );
 }

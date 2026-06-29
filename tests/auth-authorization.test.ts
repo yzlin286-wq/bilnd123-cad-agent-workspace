@@ -7,6 +7,7 @@ import {
   adminRouteAccess,
   appRouteAccess,
   canAccessProject,
+  createLocalSessionToken,
   getRequestAuthContext,
   requireSaasRequestAuth,
   safeAuthReturnPath,
@@ -32,6 +33,7 @@ test("admin route access allows only authenticated admins", () => {
   assert.equal(adminRouteAccess({ isAuthenticated: false, isAdmin: false }), "sign_in");
   assert.equal(adminRouteAccess({ isAuthenticated: true, source: "clerk", userId: "member", isAdmin: false }), "forbidden");
   assert.equal(adminRouteAccess({ isAuthenticated: true, source: "clerk", userId: "admin", isAdmin: true }), "allow");
+  assert.equal(adminRouteAccess({ isAuthenticated: true, source: "local_password", userId: "local:cad-admin", isAdmin: true }), "allow");
   assert.equal(
     adminRouteAccess({ isAuthenticated: true, source: "clerk", userId: "org-owner", organizationRole: "owner", isAdmin: false }),
     "allow",
@@ -43,6 +45,7 @@ test("admin route access allows only authenticated admins", () => {
 test("app route access requires an authenticated SaaS user", () => {
   assert.equal(appRouteAccess({ isAuthenticated: false, isAdmin: false }), "sign_in");
   assert.equal(appRouteAccess({ isAuthenticated: true, source: "clerk", userId: "member", isAdmin: false }), "allow");
+  assert.equal(appRouteAccess({ isAuthenticated: true, source: "local_password", userId: "local:cad-admin", isAdmin: true }), "allow");
   assert.equal(appRouteAccess({ isAuthenticated: true, source: "dev_bypass", userId: "local-dev", isAdmin: false }), "allow");
   assert.equal(appRouteAccess({ isAuthenticated: true, source: "staging_basic_auth", userId: "cad-admin", isAdmin: true }), "sign_in");
 });
@@ -66,6 +69,11 @@ test("artifact download requires auth and project ownership", async () => {
     "SAAS_DEV_USER_ID",
     "SAAS_DEV_ORG_ID",
     "SAAS_DEV_ADMIN",
+    "APP_AUTH_USER",
+    "APP_AUTH_PASSWORD",
+    "APP_AUTH_SESSION_SECRET",
+    "APP_AUTH_EMAIL",
+    "APP_AUTH_ORG_ID",
     "DATABASE_URL",
   ]);
   const previousStore = await readIfExists(PROJECT_STORE_PATH);
@@ -118,6 +126,9 @@ test("Basic Auth is not a SaaS identity once Clerk is configured", async () => {
     "STAGING_BASIC_AUTH_PASSWORD",
     "SAAS_DEV_AUTH_BYPASS",
     "DATABASE_URL",
+    "APP_AUTH_USER",
+    "APP_AUTH_PASSWORD",
+    "APP_AUTH_SESSION_SECRET",
   ]);
   try {
     process.env.CLERK_SECRET_KEY = "sk_test_fake";
@@ -143,6 +154,9 @@ test("project APIs reject Basic Auth-only staging identity", async () => {
     "STAGING_BASIC_AUTH_USER",
     "STAGING_BASIC_AUTH_PASSWORD",
     "SAAS_DEV_AUTH_BYPASS",
+    "APP_AUTH_USER",
+    "APP_AUTH_PASSWORD",
+    "APP_AUTH_SESSION_SECRET",
   ]);
   try {
     clearAuthEnv();
@@ -170,6 +184,10 @@ test("SaaS auth gate allows local dev bypass only when explicitly enabled", asyn
     "STAGING_BASIC_AUTH_PASSWORD",
     "SAAS_DEV_AUTH_BYPASS",
     "SAAS_DEV_USER_ID",
+    "APP_AUTH_USER",
+    "APP_AUTH_PASSWORD",
+    "APP_AUTH_SESSION_SECRET",
+    "APP_AUTH_EMAIL",
     "DATABASE_URL",
   ]);
   try {
@@ -186,6 +204,42 @@ test("SaaS auth gate allows local dev bypass only when explicitly enabled", asyn
     assert.equal(allowed.response, undefined);
     assert.equal(allowed.auth.source, "dev_bypass");
     assert.equal(allowed.auth.userId, "local-dev");
+  } finally {
+    restoreEnv(envSnapshot);
+  }
+});
+
+test("SaaS auth gate accepts a signed local password session", async () => {
+  const envSnapshot = snapshotEnv([
+    "CLERK_SECRET_KEY",
+    "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY",
+    "STAGING_BASIC_AUTH_USER",
+    "STAGING_BASIC_AUTH_PASSWORD",
+    "SAAS_DEV_AUTH_BYPASS",
+    "APP_AUTH_USER",
+    "APP_AUTH_PASSWORD",
+    "APP_AUTH_SESSION_SECRET",
+    "APP_AUTH_EMAIL",
+    "DATABASE_URL",
+  ]);
+  try {
+    clearAuthEnv();
+    process.env.APP_AUTH_USER = "cad-admin";
+    process.env.APP_AUTH_PASSWORD = "local-password";
+    process.env.APP_AUTH_SESSION_SECRET = "x".repeat(48);
+    process.env.APP_AUTH_EMAIL = "admin@example.test";
+
+    const token = createLocalSessionToken("cad-admin");
+    assert.ok(token);
+    const allowed = await requireSaasRequestAuth(
+      new Request("http://test/api/projects", { headers: { cookie: `cad_agent_session=${token}` } }),
+    );
+
+    assert.equal(allowed.response, undefined);
+    assert.equal(allowed.auth.source, "local_password");
+    assert.equal(allowed.auth.userId, "local:cad-admin");
+    assert.equal(allowed.auth.email, "admin@example.test");
+    assert.equal(allowed.auth.isAdmin, true);
   } finally {
     restoreEnv(envSnapshot);
   }
@@ -275,6 +329,11 @@ function clearAuthEnv() {
     "SAAS_DEV_USER_ID",
     "SAAS_DEV_ORG_ID",
     "SAAS_DEV_ADMIN",
+    "APP_AUTH_USER",
+    "APP_AUTH_PASSWORD",
+    "APP_AUTH_SESSION_SECRET",
+    "APP_AUTH_EMAIL",
+    "APP_AUTH_ORG_ID",
     "DATABASE_URL",
   ]) {
     delete process.env[name];
