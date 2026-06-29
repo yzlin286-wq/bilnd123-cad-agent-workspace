@@ -111,8 +111,8 @@ export async function callWorkstreamPlanner({
   const errors: string[] = [];
   for (const model of models) {
     try {
-      const content = await callOpenAICompatibleModel({
-        prompt: plannerUserPrompt(prompt),
+      const content = await callPlannerWithValidation({
+        prompt,
         model,
         config,
         systemPrompt: `You are a CAD agent planner. Return only JSON with an engineeringSpec object. Do not return status, message, markdown, or clarification objects. The CAD runner supports these exact partType values: ${SUPPORTED_TEMPLATE_IDS.join(", ")}. If matchedTemplateHints contains exactly one template, use that exact partType unless the user explicitly asks for a different supported template. If the request names a supported template but omits optional template parameters, use catalog defaults for omitted values instead of asking for clarification. Use the closest supported template only when the requested object truly matches that template. Do not approximate an unsupported object as another template. Put template-specific dimensions in engineeringSpec.parameters and also include common flat fields when they naturally exist. Use millimeters unless the user explicitly asks otherwise. Do not generate fallback CAD code. Template catalog: ${templateCatalogPrompt()}`,
@@ -128,6 +128,56 @@ export async function callWorkstreamPlanner({
   }
 
   throw new Error(`All configured real model calls failed. ${errors.join(" | ")}`);
+}
+
+async function callPlannerWithValidation({
+  prompt,
+  model,
+  config,
+  systemPrompt,
+  jsonSchema,
+}: {
+  prompt: string;
+  model: string;
+  config: AgentRuntimeConfig;
+  systemPrompt: string;
+  jsonSchema: JSONSchema;
+}) {
+  const firstPrompt = plannerUserPrompt(prompt);
+  const firstContent = await callOpenAICompatibleModel({
+    prompt: firstPrompt,
+    model,
+    config,
+    systemPrompt,
+    jsonSchema,
+  });
+  const firstValidation = validatePlannerContent(firstContent);
+  if (firstValidation.ok) return firstContent;
+
+  const repairPrompt = JSON.stringify(
+    {
+      userPrompt: prompt,
+      matchedTemplateHints: templateHintsForPrompt(prompt),
+      previousInvalidJSON: repairJSONCandidate(firstContent),
+      validationError: firstValidation.error,
+      instruction:
+        "Repair the previous response. Return only { engineeringSpec: { partType, material, units, parameters } }. Do not return status/message/clarification. This repair must still use the real model output, not local fallback.",
+    },
+    null,
+    2,
+  );
+  const repairedContent = await callOpenAICompatibleModel({
+    prompt: repairPrompt,
+    model,
+    config,
+    systemPrompt,
+    jsonSchema,
+  });
+  const repairedValidation = validatePlannerContent(repairedContent);
+  if (!repairedValidation.ok) {
+    throw new Error(`AI model returned an invalid engineering spec. ${repairedValidation.error}`);
+  }
+  return repairedContent;
 }
 
 export async function callSpecRevisionPlanner({
@@ -321,6 +371,33 @@ function assertValidJSON(content: string) {
       `Model did not return valid JSON. ${error instanceof Error ? error.message : "Unknown JSON parse error."}`,
     );
   }
+}
+
+function validatePlannerContent(content: string): { ok: true } | { ok: false; error: string } {
+  let payload: Record<string, unknown>;
+  try {
+    payload = JSON.parse(repairJSONCandidate(content)) as Record<string, unknown>;
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "invalid JSON" };
+  }
+  const spec = payload.engineeringSpec;
+  if (!spec || typeof spec !== "object" || Array.isArray(spec)) {
+    return { ok: false, error: "engineeringSpec must be an object" };
+  }
+  const record = spec as Record<string, unknown>;
+  if ("status" in record || "message" in record) {
+    return { ok: false, error: "engineeringSpec must not be a clarification/status object" };
+  }
+  if (typeof record.partType !== "string" || !record.partType.trim()) {
+    return { ok: false, error: "engineeringSpec.partType is required" };
+  }
+  if (typeof record.material !== "string" || !record.material.trim()) {
+    return { ok: false, error: "engineeringSpec.material is required" };
+  }
+  if (typeof record.units !== "string" || !record.units.trim()) {
+    return { ok: false, error: "engineeringSpec.units is required" };
+  }
+  return { ok: true };
 }
 
 export function repairJSONCandidate(content: string) {
