@@ -380,7 +380,8 @@ function shouldTryCustomBuild123d(raw: Record<string, unknown>) {
 }
 
 function partTypeFromRecord(raw: Record<string, unknown>) {
-  return String(raw.partType ?? raw.part_type ?? "mounting_plate");
+  const value = raw.partType ?? raw.part_type;
+  return typeof value === "string" && value.trim() ? value : "unknown";
 }
 
 function modelFromError(error: unknown) {

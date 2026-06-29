@@ -112,10 +112,10 @@ export async function callWorkstreamPlanner({
   for (const model of models) {
     try {
       const content = await callOpenAICompatibleModel({
-        prompt,
+        prompt: plannerUserPrompt(prompt),
         model,
         config,
-        systemPrompt: `You are a CAD agent planner. Return only JSON with an engineeringSpec object. The CAD runner supports these exact partType values: ${SUPPORTED_TEMPLATE_IDS.join(", ")}. Use the closest supported template only when the requested object truly matches that template. Do not approximate an unsupported object as another template. Put template-specific dimensions in engineeringSpec.parameters and also include common flat fields when they naturally exist. Use millimeters unless the user explicitly asks otherwise. Do not generate fallback CAD code. Template catalog: ${templateCatalogPrompt()}`,
+        systemPrompt: `You are a CAD agent planner. Return only JSON with an engineeringSpec object. Do not return status, message, markdown, or clarification objects. The CAD runner supports these exact partType values: ${SUPPORTED_TEMPLATE_IDS.join(", ")}. If matchedTemplateHints contains exactly one template, use that exact partType unless the user explicitly asks for a different supported template. If the request names a supported template but omits optional template parameters, use catalog defaults for omitted values instead of asking for clarification. Use the closest supported template only when the requested object truly matches that template. Do not approximate an unsupported object as another template. Put template-specific dimensions in engineeringSpec.parameters and also include common flat fields when they naturally exist. Use millimeters unless the user explicitly asks otherwise. Do not generate fallback CAD code. Template catalog: ${templateCatalogPrompt()}`,
         jsonSchema: ENGINEERING_SPEC_SCHEMA,
       });
       if (!content.trim()) {
@@ -362,4 +362,30 @@ function templateCatalogPrompt() {
     const aliases = template.aliases.join(", ");
     return `${template.id} (${template.title}; aliases: ${aliases}; parameters: ${params}; example: ${template.examplePrompt})`;
   }).join(" | ");
+}
+
+function plannerUserPrompt(prompt: string) {
+  return JSON.stringify(
+    {
+      userPrompt: prompt,
+      matchedTemplateHints: templateHintsForPrompt(prompt),
+      instruction:
+        "Return engineeringSpec with partType, material, units, and parameters. Do not ask for clarification when a supported template is clearly named; use template defaults for omitted optional dimensions.",
+    },
+    null,
+    2,
+  );
+}
+
+function templateHintsForPrompt(prompt: string) {
+  const normalized = prompt.toLowerCase();
+  return CAD_TEMPLATES.filter((template) => {
+    const names = [template.id, template.title, ...template.aliases].map((value) => value.toLowerCase());
+    return names.some((name) => normalized.includes(name));
+  }).map((template) => ({
+    partType: template.id,
+    title: template.title,
+    aliases: template.aliases,
+    defaultParameters: Object.fromEntries(template.parameters.map((parameter) => [parameter.key, parameter.default])),
+  }));
 }
