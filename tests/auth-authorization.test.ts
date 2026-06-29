@@ -9,6 +9,7 @@ import {
   canAccessProject,
   createLocalSessionToken,
   getRequestAuthContext,
+  publicRequestUrl,
   requireSaasRequestAuth,
   safeAuthReturnPath,
   signInRedirectPath,
@@ -57,6 +58,26 @@ test("sign-in redirect path preserves internal return targets only", () => {
   assert.equal(signInRedirectPath("//evil.example/app"), "/sign-in?redirect_url=%2Fapp");
   assert.equal(safeAuthReturnPath("/api/health"), "/app");
   assert.equal(safeAuthReturnPath("/sign-in?redirect_url=/admin"), "/app");
+});
+
+test("public auth redirects prefer configured staging public URL over localhost request URL", () => {
+  const envSnapshot = snapshotEnv(["STAGING_PUBLIC_BASE_URL", "APP_PUBLIC_BASE_URL", "STAGING_HTTPS_ENABLED"]);
+  try {
+    process.env.STAGING_PUBLIC_BASE_URL = "http://43.138.153.37:12602";
+    const url = publicRequestUrl(new Request("http://localhost:3000/api/auth/login"), "/sign-in?redirect_url=%2Fapp&error=invalid");
+    assert.equal(url.toString(), "http://43.138.153.37:12602/sign-in?redirect_url=%2Fapp&error=invalid");
+
+    delete process.env.STAGING_PUBLIC_BASE_URL;
+    const forwarded = publicRequestUrl(
+      new Request("http://localhost:3000/api/auth/login", {
+        headers: { host: "localhost:3000", "x-forwarded-host": "cad.example.test", "x-forwarded-proto": "https" },
+      }),
+      "/app",
+    );
+    assert.equal(forwarded.toString(), "https://cad.example.test/app");
+  } finally {
+    restoreEnv(envSnapshot);
+  }
 });
 
 test("artifact download requires auth and project ownership", async () => {

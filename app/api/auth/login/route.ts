@@ -5,6 +5,7 @@ import {
   isLocalSessionCookieSecure,
   LOCAL_SESSION_COOKIE_NAME,
   LOCAL_SESSION_TTL_SECONDS,
+  publicRequestUrl,
   safeAuthReturnPath,
   verifyLocalPassword,
 } from "@/lib/server/auth";
@@ -29,7 +30,7 @@ export async function POST(request: Request) {
     return redirectToSignIn(request, returnPath, "not_configured");
   }
 
-  const response = NextResponse.redirect(new URL(returnPath, request.url), { status: 303 });
+  const response = NextResponse.redirect(publicRequestUrl(request, returnPath), { status: 303 });
   response.cookies.set(LOCAL_SESSION_COOKIE_NAME, token, {
     httpOnly: true,
     sameSite: "lax",
@@ -41,7 +42,7 @@ export async function POST(request: Request) {
 }
 
 function redirectToSignIn(request: Request, returnPath: string, error: "invalid" | "not_configured") {
-  const url = new URL("/sign-in", request.url);
+  const url = publicRequestUrl(request, "/sign-in");
   url.searchParams.set("redirect_url", returnPath);
   url.searchParams.set("error", error);
   return NextResponse.redirect(url, { status: 303 });

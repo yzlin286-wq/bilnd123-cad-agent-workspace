@@ -251,6 +251,13 @@ export function isLocalSessionCookieSecure(env: Record<string, string | undefine
   return env.STAGING_HTTPS_ENABLED === "1" || env.APP_AUTH_COOKIE_SECURE === "1";
 }
 
+export function publicRequestUrl(request: Request, path: string) {
+  const safePath = path.startsWith("/") && !path.startsWith("//") && !path.includes("\\") ? path : "/app";
+  const configuredBase = normalizePublicBaseUrl(process.env.STAGING_PUBLIC_BASE_URL || process.env.APP_PUBLIC_BASE_URL);
+  const headerBase = requestOriginFromHeaders(request);
+  return new URL(safePath, configuredBase || headerBase || request.url);
+}
+
 export function isBasicAuthHeaderAuthorized(header: string | null) {
   const user = process.env.STAGING_BASIC_AUTH_USER;
   const password = process.env.STAGING_BASIC_AUTH_PASSWORD;
@@ -319,6 +326,35 @@ function readCookie(cookieHeader: string | null, name: string) {
     if (rawName === name) return valueParts.join("=");
   }
   return undefined;
+}
+
+function normalizePublicBaseUrl(value: string | undefined) {
+  const trimmed = value?.trim();
+  if (!trimmed) return undefined;
+  try {
+    const url = new URL(trimmed);
+    if (!["http:", "https:"].includes(url.protocol)) return undefined;
+    return url.origin;
+  } catch {
+    return undefined;
+  }
+}
+
+function requestOriginFromHeaders(request: Request) {
+  const forwardedHost = firstHeaderValue(request.headers.get("x-forwarded-host"));
+  const host = forwardedHost || firstHeaderValue(request.headers.get("host"));
+  if (!host) return undefined;
+  const proto =
+    firstHeaderValue(request.headers.get("x-forwarded-proto")) ||
+    (process.env.STAGING_HTTPS_ENABLED === "1" ? "https" : "http");
+  return `${proto}://${host}`;
+}
+
+function firstHeaderValue(value: string | null) {
+  return value
+    ?.split(",")[0]
+    ?.trim()
+    .replace(/\/+$/, "");
 }
 
 function envList(name: string) {

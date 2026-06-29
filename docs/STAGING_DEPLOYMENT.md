@@ -39,6 +39,7 @@ STAGING_BASIC_AUTH_PASSWORD=replace-with-strong-staging-password
 STAGING_ACCESS_MODE=unknown
 STAGING_DOMAIN=
 STAGING_HTTPS_ENABLED=0
+STAGING_PUBLIC_BASE_URL=http://server.example.com:12602
 APP_COMMIT_SHA=
 
 CLERK_SECRET_KEY=replace-with-real-clerk-secret-key
@@ -66,6 +67,8 @@ Never prefix model keys with `NEXT_PUBLIC_`. Browser code must not receive `CAD_
 The local password values are server-only runtime settings. Do not prefix them with `NEXT_PUBLIC_`, and keep `.env` at `chmod 600`. Clerk keys are optional legacy handoff values and are ignored unless `SAAS_AUTH_PROVIDER=clerk`.
 
 Set `APP_COMMIT_SHA` to the deployed commit before building, for example `APP_COMMIT_SHA=$(git rev-parse --short HEAD)`. `/api/health`, staging smoke, and v1.2 handoff reports expose only this sanitized commit value so the verified deployment can be tied back to a Git commit.
+
+Set `STAGING_PUBLIC_BASE_URL` to the URL testers actually open. This prevents login success or error redirects from using the container-internal `localhost:3000` origin.
 
 ## Docker Compose
 
