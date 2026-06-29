@@ -13,6 +13,7 @@ export async function appendRunHistory(entry: {
   runId: string;
   prompt?: string;
   model?: string;
+  partType?: string;
   status: "success" | "failure";
   durationMs: number;
   revision?: CADRevision;
@@ -29,7 +30,7 @@ export async function appendRunHistory(entry: {
     projectId: entry.projectId,
     userId: entry.userId,
     organizationId: entry.organizationId,
-    partType: entry.revision?.engineeringSpec.partType,
+    partType: entry.revision?.engineeringSpec.partType ?? entry.partType,
     model: entry.model,
     status: entry.status,
     durationMs: Math.round(entry.durationMs),
@@ -45,7 +46,7 @@ export async function appendRunHistory(entry: {
     userId: entry.userId,
     organizationId: entry.organizationId,
     projectId: entry.projectId,
-    partType: entry.revision?.engineeringSpec.partType,
+    partType: entry.revision?.engineeringSpec.partType ?? entry.partType,
     status: entry.status,
     durationMs: entry.durationMs,
     errorCode: entry.errorCode,

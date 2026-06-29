@@ -16,10 +16,16 @@ type RunContext = {
   projectId?: string;
 };
 
+type PlanningContextError = Error & {
+  model?: string;
+  partType?: string;
+};
+
 export async function runAgentOrchestration(prompt: string, emit: Emit, route: RunHistoryRoute = "/api/agent/run", context: RunContext = {}) {
   const runId = randomUUID();
   const startedAt = performance.now();
   let model: string | undefined;
+  let plannedPartType: string | undefined;
   await emit({ type: "run.started", runId, prompt });
   await emitStep(emit, "understand", "Understanding request", "running");
 
@@ -47,6 +53,7 @@ export async function runAgentOrchestration(prompt: string, emit: Emit, route: R
     const created = await createEngineeringSpec(prompt);
     const spec = created.spec;
     model = created.model;
+    plannedPartType = spec.partType;
     await emitStep(emit, "understand", "Understanding request", "done");
     await emitStep(emit, "spec", "Creating engineering spec", "done", `${spec.length} x ${spec.width} x ${spec.thickness} ${spec.units}`);
     await emit({ type: "spec", spec });
@@ -107,6 +114,8 @@ export async function runAgentOrchestration(prompt: string, emit: Emit, route: R
       return;
     }
 
+    model = model ?? modelFromError(error);
+    const partType = partTypeFromError(error) ?? plannedPartType;
     const errorCode = operationalErrorCode(error, "AGENT_RUN_FAILED");
     const userMessage = userMessageForErrorCode(
       errorCode,
@@ -123,6 +132,7 @@ export async function runAgentOrchestration(prompt: string, emit: Emit, route: R
       runId,
       prompt,
       model,
+      partType,
       status: "failure",
       durationMs: performance.now() - startedAt,
       errorCode,
@@ -149,6 +159,7 @@ export async function runRevisionOrchestration({
   const runId = randomUUID();
   const startedAt = performance.now();
   let model: string | undefined;
+  let plannedPartType: string | undefined;
   await emit({ type: "run.started", runId, prompt: userPrompt });
   await emitStep(emit, "understand", "Understanding revision", "running");
 
@@ -176,6 +187,7 @@ export async function runRevisionOrchestration({
     const revised = await reviseEngineeringSpec({ currentSpec, currentRevisionId, userPrompt });
     const spec = revised.spec;
     model = revised.model;
+    plannedPartType = spec.partType;
     await emitStep(emit, "understand", "Understanding revision", "done");
     await emitStep(emit, "spec", "Updating engineering spec", "done", `${spec.length} x ${spec.width} x ${spec.thickness} ${spec.units}`);
     await emit({ type: "spec", spec });
@@ -234,6 +246,8 @@ export async function runRevisionOrchestration({
       return;
     }
 
+    model = model ?? modelFromError(error);
+    const partType = partTypeFromError(error) ?? plannedPartType;
     const errorCode = operationalErrorCode(error, "REVISION_FAILED");
     const userMessage = userMessageForErrorCode(
       errorCode,
@@ -250,6 +264,7 @@ export async function runRevisionOrchestration({
       runId,
       prompt: userPrompt,
       model,
+      partType,
       status: "failure",
       durationMs: performance.now() - startedAt,
       errorCode,
@@ -263,13 +278,21 @@ async function createEngineeringSpec(prompt: string): Promise<{ spec: Engineerin
     prompt,
     config: getRuntimeConfig(),
   });
-  const payload = extractJSON(result.content);
-  const raw = payload.engineeringSpec ?? payload.spec ?? payload;
-  if (!isRecord(raw)) {
-    throw new Error("AI model returned an invalid engineering spec.");
+  try {
+    const payload = extractJSON(result.content);
+    const raw = payload.engineeringSpec ?? payload.spec ?? payload;
+    if (!isRecord(raw)) {
+      throw new Error("AI model returned an invalid engineering spec.");
+    }
+    rejectUnsupportedPartType(raw);
+    return { spec: normalizeSpec(raw), model: result.model };
+  } catch (error) {
+    const raw = safeExtractRaw(result.content);
+    throw withPlanningContext(error, {
+      model: result.model,
+      partType: raw ? partTypeFromRecord(raw) : undefined,
+    });
   }
-  rejectUnsupportedPartType(raw);
-  return { spec: normalizeSpec(raw), model: result.model };
 }
 
 async function reviseEngineeringSpec({
@@ -315,9 +338,44 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function rejectUnsupportedPartType(raw: Record<string, unknown>) {
-  const partType = String(raw.partType ?? raw.part_type ?? "mounting_plate");
+  const partType = partTypeFromRecord(raw);
   if (partType !== "mounting_plate" && partType !== "l_bracket") {
-    throw new Error(`Unsupported partType '${partType}'. Supported partType values: mounting_plate, l_bracket.`);
+    const error = new Error(`Unsupported partType '${partType}'. Supported partType values: mounting_plate, l_bracket.`) as PlanningContextError;
+    error.partType = partType;
+    throw error;
+  }
+}
+
+function partTypeFromRecord(raw: Record<string, unknown>) {
+  return String(raw.partType ?? raw.part_type ?? "mounting_plate");
+}
+
+function modelFromError(error: unknown) {
+  return isPlanningContextError(error) ? error.model : undefined;
+}
+
+function partTypeFromError(error: unknown) {
+  return isPlanningContextError(error) ? error.partType : undefined;
+}
+
+function isPlanningContextError(error: unknown): error is PlanningContextError {
+  return Boolean(error && typeof error === "object" && ("model" in error || "partType" in error));
+}
+
+function withPlanningContext(error: unknown, context: { model?: string; partType?: string }) {
+  const enriched = (error instanceof Error ? error : new Error(String(error || "Unknown planning error."))) as PlanningContextError;
+  enriched.model = enriched.model ?? context.model;
+  enriched.partType = enriched.partType ?? context.partType;
+  return enriched;
+}
+
+function safeExtractRaw(content: string) {
+  try {
+    const payload = extractJSON(content);
+    const raw = payload.engineeringSpec ?? payload.spec ?? payload;
+    return isRecord(raw) ? raw : undefined;
+  } catch {
+    return undefined;
   }
 }
 
