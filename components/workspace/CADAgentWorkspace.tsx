@@ -5,6 +5,7 @@ import { Sparkles } from "lucide-react";
 import { HeroComposer } from "@/components/landing/HeroComposer";
 import { AgentThread, type ThreadMessage } from "@/components/agent/AgentThread";
 import { CADArtifactCanvas } from "@/components/cad/CADArtifactCanvas";
+import { createClientId } from "@/lib/client/ids";
 import {
   WORKSTREAM_TEMPLATE,
   type CADArtifact,
@@ -520,12 +521,12 @@ function upsertArtifact(artifacts: CADArtifact[], artifact: CADArtifact) {
 }
 
 function userThreadMessage(content: string): ThreadMessage {
-  return { id: crypto.randomUUID(), role: "user", content };
+  return { id: createClientId("user-message"), role: "user", content };
 }
 
 function agentThreadMessage(revisionLabel: string, steps = cloneSteps()): ThreadMessage {
   return {
-    id: crypto.randomUUID(),
+    id: createClientId("agent-message"),
     role: "agent",
     revisionLabel,
     steps,
