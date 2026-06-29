@@ -2,6 +2,7 @@ import Link from "next/link";
 import { AlertTriangle, ArrowRight, Box, FileArchive, Gauge, History, Plus, Upload } from "lucide-react";
 import type { ReactNode } from "react";
 import { UserMenu } from "@/components/auth/UserMenu";
+import { templatesByCategory } from "@/lib/cad/templates";
 import { getAdminSummary } from "@/lib/server/admin-summary";
 import { appRouteAccess, getPageAuthContext, signInRedirectPath } from "@/lib/server/auth";
 import { listProjects, recentArtifacts } from "@/lib/server/project-store";
@@ -19,6 +20,7 @@ export default async function AppDashboardPage() {
     recentArtifacts({ auth, limit: 6 }),
     getAdminSummary(),
   ]);
+  const templateGroups = templatesByCategory();
 
   return (
     <main className="saas-shell">
@@ -42,19 +44,27 @@ export default async function AppDashboardPage() {
         </Link>
       </section>
 
+      {Object.entries(templateGroups).map(([category, templates]) => (
+        <section className="template-section" key={category}>
+          <div className="template-section-header">
+            <p className="microcopy">{category}</p>
+            <h2>{templates.length} supported templates</h2>
+          </div>
+          <div className="template-grid">
+            {templates.map((template) => (
+              <TemplateCard
+                icon={template.category === "Rotational" ? <Gauge size={20} /> : <Box size={20} />}
+                title={template.title}
+                description={template.description}
+                href={`/app/workspace?template=${encodeURIComponent(template.id)}`}
+                key={template.id}
+              />
+            ))}
+          </div>
+        </section>
+      ))}
+
       <section className="template-grid">
-        <TemplateCard
-          icon={<Box size={20} />}
-          title="Mounting Plate"
-          description="Rectangular plate with validated corner hole layout and chamfer."
-          href="/app/workspace?template=mounting_plate"
-        />
-        <TemplateCard
-          icon={<Gauge size={20} />}
-          title="L Bracket"
-          description="Two-leg bracket with length, height, width, thickness, holes, and chamfer."
-          href="/app/workspace?template=l_bracket"
-        />
         <article className="template-card disabled">
           <Upload size={20} />
           <h3>Upload Sketch</h3>
@@ -118,7 +128,7 @@ export default async function AppDashboardPage() {
             </div>
           </div>
           <p className="panel-note">
-            Supported templates remain limited to mounting_plate and l_bracket. Upload sketch and arbitrary CAD are not enabled.
+            Supported template catalog has 20 deterministic build123d templates. Upload sketch and anonymous arbitrary CAD are not enabled.
           </p>
         </Panel>
       </section>

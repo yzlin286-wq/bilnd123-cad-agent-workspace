@@ -1,0 +1,325 @@
+[
+  {
+    "id": "mounting_plate",
+    "title": "Mounting Plate",
+    "category": "Plate / Bracket",
+    "description": "Rectangular plate with four validated corner holes.",
+    "examplePrompt": "Make a 120 x 80 x 4 mm mounting plate with four 4.5 mm holes, 10 mm edge offset, and 1 mm chamfer.",
+    "aliases": ["plate", "fixture plate", "mounting board", "安装板", "固定板", "底板"],
+    "parameters": [
+      { "key": "length", "label": "Length", "unit": "mm", "default": 120, "min": 20, "max": 300 },
+      { "key": "width", "label": "Width", "unit": "mm", "default": 80, "min": 20, "max": 240 },
+      { "key": "thickness", "label": "Thickness", "unit": "mm", "default": 4, "min": 1, "max": 30 },
+      { "key": "holeDiameter", "label": "Hole diameter", "unit": "mm", "default": 4.5, "min": 1, "max": 30 },
+      { "key": "edgeOffset", "label": "Edge offset", "unit": "mm", "default": 10, "min": 2, "max": 80 },
+      { "key": "chamfer", "label": "Chamfer", "unit": "mm", "default": 1, "min": 0, "max": 8 }
+    ]
+  },
+  {
+    "id": "l_bracket",
+    "title": "L Bracket",
+    "category": "Plate / Bracket",
+    "description": "Two-leg angle bracket with mounting holes.",
+    "examplePrompt": "Create a 90 x 60 x 40 mm L bracket, 5 mm thick, with 5 mm holes.",
+    "aliases": ["angle bracket", "90 degree bracket", "L型支架", "角码", "直角支架"],
+    "parameters": [
+      { "key": "length", "label": "Length", "unit": "mm", "default": 90, "min": 30, "max": 260 },
+      { "key": "height", "label": "Height", "unit": "mm", "default": 60, "min": 20, "max": 220 },
+      { "key": "width", "label": "Width", "unit": "mm", "default": 40, "min": 20, "max": 180 },
+      { "key": "thickness", "label": "Thickness", "unit": "mm", "default": 5, "min": 1, "max": 30 },
+      { "key": "holeDiameter", "label": "Hole diameter", "unit": "mm", "default": 5, "min": 1, "max": 30 },
+      { "key": "edgeOffset", "label": "Edge offset", "unit": "mm", "default": 12, "min": 2, "max": 80 },
+      { "key": "chamfer", "label": "Chamfer", "unit": "mm", "default": 1, "min": 0, "max": 8 }
+    ]
+  },
+  {
+    "id": "gusset_plate",
+    "title": "Gusset Plate",
+    "category": "Plate / Bracket",
+    "description": "Vertical reinforcing gusset plate with mounting holes.",
+    "examplePrompt": "Make a 100 mm by 70 mm gusset plate, 6 mm thick, with 5 mm holes.",
+    "aliases": ["gusset", "reinforcing plate", "加劲板", "筋板", "三角加强板"],
+    "parameters": [
+      { "key": "length", "label": "Length", "unit": "mm", "default": 100, "min": 30, "max": 260 },
+      { "key": "height", "label": "Height", "unit": "mm", "default": 70, "min": 20, "max": 220 },
+      { "key": "thickness", "label": "Thickness", "unit": "mm", "default": 6, "min": 2, "max": 30 },
+      { "key": "holeDiameter", "label": "Hole diameter", "unit": "mm", "default": 5, "min": 1, "max": 30 },
+      { "key": "edgeOffset", "label": "Edge offset", "unit": "mm", "default": 12, "min": 3, "max": 80 },
+      { "key": "chamfer", "label": "Chamfer", "unit": "mm", "default": 0.5, "min": 0, "max": 8 }
+    ]
+  },
+  {
+    "id": "u_bracket",
+    "title": "U Bracket",
+    "category": "Plate / Bracket",
+    "description": "U-shaped bracket with base and two side walls.",
+    "examplePrompt": "Build a U bracket 100 mm long, 50 mm wide, 60 mm high, 5 mm thick, with 5 mm holes.",
+    "aliases": ["u bracket", "clevis bracket", "U型支架", "叉形支架", "槽形支架"],
+    "parameters": [
+      { "key": "length", "label": "Length", "unit": "mm", "default": 100, "min": 40, "max": 260 },
+      { "key": "width", "label": "Width", "unit": "mm", "default": 50, "min": 20, "max": 180 },
+      { "key": "height", "label": "Height", "unit": "mm", "default": 60, "min": 20, "max": 220 },
+      { "key": "thickness", "label": "Thickness", "unit": "mm", "default": 5, "min": 2, "max": 30 },
+      { "key": "holeDiameter", "label": "Hole diameter", "unit": "mm", "default": 5, "min": 1, "max": 30 },
+      { "key": "edgeOffset", "label": "Edge offset", "unit": "mm", "default": 12, "min": 3, "max": 80 },
+      { "key": "chamfer", "label": "Chamfer", "unit": "mm", "default": 0.5, "min": 0, "max": 8 }
+    ]
+  },
+  {
+    "id": "c_channel",
+    "title": "C Channel",
+    "category": "Plate / Bracket",
+    "description": "Open C-channel rail or structural channel.",
+    "examplePrompt": "Create a 160 mm long C channel, 60 mm wide, 40 mm high, 4 mm thick.",
+    "aliases": ["channel", "c section", "rail", "C型槽", "槽钢", "导轨"],
+    "parameters": [
+      { "key": "length", "label": "Length", "unit": "mm", "default": 160, "min": 40, "max": 400 },
+      { "key": "width", "label": "Width", "unit": "mm", "default": 60, "min": 20, "max": 200 },
+      { "key": "height", "label": "Height", "unit": "mm", "default": 40, "min": 15, "max": 180 },
+      { "key": "thickness", "label": "Thickness", "unit": "mm", "default": 4, "min": 1, "max": 25 },
+      { "key": "chamfer", "label": "Chamfer", "unit": "mm", "default": 0.5, "min": 0, "max": 8 }
+    ]
+  },
+  {
+    "id": "angle_bracket_gusset",
+    "title": "Gusseted Angle Bracket",
+    "category": "Plate / Bracket",
+    "description": "L bracket with a central reinforcing web.",
+    "examplePrompt": "Make a gusseted angle bracket 100 mm long, 70 mm high, 50 mm wide, 6 mm thick.",
+    "aliases": ["gusseted bracket", "reinforced angle bracket", "带筋角码", "加强角支架", "带加强筋支架"],
+    "parameters": [
+      { "key": "length", "label": "Length", "unit": "mm", "default": 100, "min": 40, "max": 260 },
+      { "key": "height", "label": "Height", "unit": "mm", "default": 70, "min": 25, "max": 220 },
+      { "key": "width", "label": "Width", "unit": "mm", "default": 50, "min": 20, "max": 180 },
+      { "key": "thickness", "label": "Thickness", "unit": "mm", "default": 6, "min": 2, "max": 30 },
+      { "key": "holeDiameter", "label": "Hole diameter", "unit": "mm", "default": 5, "min": 1, "max": 30 },
+      { "key": "edgeOffset", "label": "Edge offset", "unit": "mm", "default": 14, "min": 3, "max": 80 },
+      { "key": "chamfer", "label": "Chamfer", "unit": "mm", "default": 0.5, "min": 0, "max": 8 }
+    ]
+  },
+  {
+    "id": "simple_enclosure",
+    "title": "Simple Enclosure",
+    "category": "Enclosure",
+    "description": "Open-top rectangular electronics enclosure.",
+    "examplePrompt": "Design a 120 x 80 x 40 mm simple enclosure with 3 mm walls.",
+    "aliases": ["box enclosure", "electronics box", "case", "外壳", "盒子", "电子外壳"],
+    "parameters": [
+      { "key": "length", "label": "Length", "unit": "mm", "default": 120, "min": 40, "max": 300 },
+      { "key": "width", "label": "Width", "unit": "mm", "default": 80, "min": 30, "max": 240 },
+      { "key": "height", "label": "Height", "unit": "mm", "default": 40, "min": 15, "max": 180 },
+      { "key": "wallThickness", "label": "Wall thickness", "unit": "mm", "default": 3, "min": 1, "max": 16 },
+      { "key": "holeDiameter", "label": "Mount hole diameter", "unit": "mm", "default": 3, "min": 1, "max": 16 },
+      { "key": "edgeOffset", "label": "Mount offset", "unit": "mm", "default": 10, "min": 3, "max": 60 },
+      { "key": "chamfer", "label": "Chamfer", "unit": "mm", "default": 0.5, "min": 0, "max": 8 }
+    ]
+  },
+  {
+    "id": "enclosure_lid",
+    "title": "Enclosure Lid",
+    "category": "Enclosure",
+    "description": "Flat lid plate with corner fastener holes.",
+    "examplePrompt": "Make an enclosure lid 120 x 80 x 3 mm with 3 mm screw holes.",
+    "aliases": ["cover plate", "box lid", "case cover", "盖板", "外壳盖", "盒盖"],
+    "parameters": [
+      { "key": "length", "label": "Length", "unit": "mm", "default": 120, "min": 30, "max": 300 },
+      { "key": "width", "label": "Width", "unit": "mm", "default": 80, "min": 20, "max": 240 },
+      { "key": "thickness", "label": "Thickness", "unit": "mm", "default": 3, "min": 1, "max": 20 },
+      { "key": "holeDiameter", "label": "Hole diameter", "unit": "mm", "default": 3, "min": 1, "max": 20 },
+      { "key": "edgeOffset", "label": "Edge offset", "unit": "mm", "default": 10, "min": 3, "max": 80 },
+      { "key": "chamfer", "label": "Chamfer", "unit": "mm", "default": 0.5, "min": 0, "max": 8 }
+    ]
+  },
+  {
+    "id": "electronics_mounting_base",
+    "title": "Electronics Mounting Base",
+    "category": "Enclosure",
+    "description": "Base plate with four raised PCB standoffs.",
+    "examplePrompt": "Create a 100 x 70 x 4 mm electronics mounting base with 8 mm posts.",
+    "aliases": ["pcb base", "electronics base", "standoff plate", "PCB底座", "电路板底座", "电子安装底板"],
+    "parameters": [
+      { "key": "length", "label": "Length", "unit": "mm", "default": 100, "min": 40, "max": 260 },
+      { "key": "width", "label": "Width", "unit": "mm", "default": 70, "min": 30, "max": 220 },
+      { "key": "thickness", "label": "Base thickness", "unit": "mm", "default": 4, "min": 1, "max": 20 },
+      { "key": "postDiameter", "label": "Post diameter", "unit": "mm", "default": 8, "min": 3, "max": 30 },
+      { "key": "postHeight", "label": "Post height", "unit": "mm", "default": 8, "min": 2, "max": 60 },
+      { "key": "holeDiameter", "label": "Pilot hole diameter", "unit": "mm", "default": 3, "min": 1, "max": 20 },
+      { "key": "edgeOffset", "label": "Post offset", "unit": "mm", "default": 12, "min": 4, "max": 80 },
+      { "key": "chamfer", "label": "Chamfer", "unit": "mm", "default": 0.5, "min": 0, "max": 8 }
+    ]
+  },
+  {
+    "id": "round_flange",
+    "title": "Round Flange",
+    "category": "Rotational",
+    "description": "Circular flange with center bore and bolt circle.",
+    "examplePrompt": "Make a round flange, 100 mm outer diameter, 10 mm thick, 30 mm center bore, six 6 mm bolt holes.",
+    "aliases": ["circular flange", "pipe flange", "圆法兰", "管法兰", "圆形法兰"],
+    "parameters": [
+      { "key": "outerDiameter", "label": "Outer diameter", "unit": "mm", "default": 100, "min": 20, "max": 300 },
+      { "key": "thickness", "label": "Thickness", "unit": "mm", "default": 10, "min": 2, "max": 60 },
+      { "key": "holeDiameter", "label": "Center bore", "unit": "mm", "default": 30, "min": 1, "max": 180 },
+      { "key": "boltCircleDiameter", "label": "Bolt circle", "unit": "mm", "default": 75, "min": 10, "max": 260 },
+      { "key": "boltHoleDiameter", "label": "Bolt hole diameter", "unit": "mm", "default": 6, "min": 1, "max": 40 },
+      { "key": "holeCount", "label": "Bolt holes", "unit": "count", "default": 6, "min": 3, "max": 16 },
+      { "key": "chamfer", "label": "Chamfer", "unit": "mm", "default": 0.5, "min": 0, "max": 8 }
+    ]
+  },
+  {
+    "id": "rectangular_flange",
+    "title": "Rectangular Flange",
+    "category": "Plate / Bracket",
+    "description": "Rectangular flange with center opening and four bolt holes.",
+    "examplePrompt": "Create a 120 x 80 x 8 mm rectangular flange with a 35 mm center hole and 6 mm bolt holes.",
+    "aliases": ["rect flange", "mounting flange", "矩形法兰", "方形法兰", "安装法兰"],
+    "parameters": [
+      { "key": "length", "label": "Length", "unit": "mm", "default": 120, "min": 40, "max": 300 },
+      { "key": "width", "label": "Width", "unit": "mm", "default": 80, "min": 30, "max": 240 },
+      { "key": "thickness", "label": "Thickness", "unit": "mm", "default": 8, "min": 2, "max": 50 },
+      { "key": "holeDiameter", "label": "Center hole", "unit": "mm", "default": 35, "min": 1, "max": 160 },
+      { "key": "boltHoleDiameter", "label": "Bolt hole diameter", "unit": "mm", "default": 6, "min": 1, "max": 40 },
+      { "key": "edgeOffset", "label": "Bolt edge offset", "unit": "mm", "default": 14, "min": 4, "max": 80 },
+      { "key": "chamfer", "label": "Chamfer", "unit": "mm", "default": 0.5, "min": 0, "max": 8 }
+    ]
+  },
+  {
+    "id": "stepped_shaft",
+    "title": "Stepped Shaft",
+    "category": "Rotational",
+    "description": "Two-diameter shaft for simple rotational parts.",
+    "examplePrompt": "Make a stepped shaft 120 mm long, 24 mm main diameter, 16 mm secondary diameter, with a 45 mm step.",
+    "aliases": ["shaft", "turned shaft", "阶梯轴", "转轴", "台阶轴"],
+    "parameters": [
+      { "key": "length", "label": "Length", "unit": "mm", "default": 120, "min": 20, "max": 400 },
+      { "key": "diameter", "label": "Main diameter", "unit": "mm", "default": 24, "min": 4, "max": 120 },
+      { "key": "secondaryDiameter", "label": "Secondary diameter", "unit": "mm", "default": 16, "min": 3, "max": 100 },
+      { "key": "stepLength", "label": "Step length", "unit": "mm", "default": 45, "min": 5, "max": 250 },
+      { "key": "chamfer", "label": "Chamfer", "unit": "mm", "default": 0.5, "min": 0, "max": 8 }
+    ]
+  },
+  {
+    "id": "spacer_standoff",
+    "title": "Spacer Standoff",
+    "category": "Rotational",
+    "description": "Cylindrical spacer with through bore.",
+    "examplePrompt": "Generate a 25 mm long spacer standoff, 10 mm outer diameter, 4 mm inner bore.",
+    "aliases": ["spacer", "standoff", "隔套", "支撑柱", "间隔柱"],
+    "parameters": [
+      { "key": "outerDiameter", "label": "Outer diameter", "unit": "mm", "default": 10, "min": 3, "max": 80 },
+      { "key": "innerDiameter", "label": "Inner diameter", "unit": "mm", "default": 4, "min": 1, "max": 60 },
+      { "key": "length", "label": "Length", "unit": "mm", "default": 25, "min": 3, "max": 200 },
+      { "key": "chamfer", "label": "Chamfer", "unit": "mm", "default": 0.3, "min": 0, "max": 6 }
+    ]
+  },
+  {
+    "id": "bushing_sleeve",
+    "title": "Bushing Sleeve",
+    "category": "Rotational",
+    "description": "Sleeve bushing with flange and through bore.",
+    "examplePrompt": "Create a bushing sleeve 35 mm long, 22 mm outer diameter, 10 mm bore, with a 32 mm flange.",
+    "aliases": ["bushing", "sleeve bearing", "衬套", "轴套", "套筒"],
+    "parameters": [
+      { "key": "outerDiameter", "label": "Outer diameter", "unit": "mm", "default": 22, "min": 5, "max": 120 },
+      { "key": "innerDiameter", "label": "Inner diameter", "unit": "mm", "default": 10, "min": 1, "max": 100 },
+      { "key": "length", "label": "Length", "unit": "mm", "default": 35, "min": 5, "max": 240 },
+      { "key": "flangeDiameter", "label": "Flange diameter", "unit": "mm", "default": 32, "min": 8, "max": 160 },
+      { "key": "flangeThickness", "label": "Flange thickness", "unit": "mm", "default": 5, "min": 1, "max": 50 },
+      { "key": "chamfer", "label": "Chamfer", "unit": "mm", "default": 0.5, "min": 0, "max": 8 }
+    ]
+  },
+  {
+    "id": "shaft_collar",
+    "title": "Shaft Collar",
+    "category": "Rotational",
+    "description": "Clamp collar with bore and split slot.",
+    "examplePrompt": "Make a shaft collar 36 mm outer diameter, 16 mm bore, 14 mm wide, with a 3 mm split slot.",
+    "aliases": ["collar", "clamp collar", "轴环", "夹紧环", "固定环"],
+    "parameters": [
+      { "key": "outerDiameter", "label": "Outer diameter", "unit": "mm", "default": 36, "min": 8, "max": 160 },
+      { "key": "innerDiameter", "label": "Bore diameter", "unit": "mm", "default": 16, "min": 2, "max": 120 },
+      { "key": "width", "label": "Width", "unit": "mm", "default": 14, "min": 3, "max": 80 },
+      { "key": "slotWidth", "label": "Slot width", "unit": "mm", "default": 3, "min": 0.5, "max": 20 },
+      { "key": "holeDiameter", "label": "Clamp hole diameter", "unit": "mm", "default": 4, "min": 1, "max": 30 },
+      { "key": "chamfer", "label": "Chamfer", "unit": "mm", "default": 0.5, "min": 0, "max": 8 }
+    ]
+  },
+  {
+    "id": "pulley",
+    "title": "Pulley",
+    "category": "Rotational",
+    "description": "Grooved pulley blank with center bore.",
+    "examplePrompt": "Create a 60 mm diameter pulley, 18 mm wide, 8 mm bore, with a 3 mm groove.",
+    "aliases": ["belt pulley", "wheel pulley", "皮带轮", "滑轮", "带轮"],
+    "parameters": [
+      { "key": "outerDiameter", "label": "Outer diameter", "unit": "mm", "default": 60, "min": 15, "max": 220 },
+      { "key": "width", "label": "Width", "unit": "mm", "default": 18, "min": 4, "max": 100 },
+      { "key": "boreDiameter", "label": "Bore diameter", "unit": "mm", "default": 8, "min": 1, "max": 120 },
+      { "key": "grooveDepth", "label": "Groove depth", "unit": "mm", "default": 3, "min": 0, "max": 20 },
+      { "key": "chamfer", "label": "Chamfer", "unit": "mm", "default": 0.5, "min": 0, "max": 8 }
+    ]
+  },
+  {
+    "id": "spur_gear",
+    "title": "Spur Gear",
+    "category": "Rotational",
+    "description": "Simplified spur gear with radial teeth and center bore.",
+    "examplePrompt": "Make a spur gear with 24 teeth, 80 mm outer diameter, 10 mm wide, and 12 mm bore.",
+    "aliases": ["gear", "toothed gear", "齿轮", "直齿轮", "圆柱齿轮"],
+    "parameters": [
+      { "key": "outerDiameter", "label": "Outer diameter", "unit": "mm", "default": 80, "min": 20, "max": 240 },
+      { "key": "width", "label": "Face width", "unit": "mm", "default": 10, "min": 3, "max": 80 },
+      { "key": "boreDiameter", "label": "Bore diameter", "unit": "mm", "default": 12, "min": 1, "max": 120 },
+      { "key": "toothCount", "label": "Tooth count", "unit": "count", "default": 24, "min": 8, "max": 80 },
+      { "key": "toothDepth", "label": "Tooth depth", "unit": "mm", "default": 4, "min": 0.5, "max": 20 },
+      { "key": "chamfer", "label": "Chamfer", "unit": "mm", "default": 0, "min": 0, "max": 8 }
+    ]
+  },
+  {
+    "id": "helical_spring",
+    "title": "Helical Spring",
+    "category": "Motion / Mounting",
+    "description": "Swept-wire helical compression spring.",
+    "examplePrompt": "Build a 1000 mm long by 200 mm outer diameter helical spring with 12 mm wire and 80 mm pitch.",
+    "aliases": ["spring", "coil spring", "compression spring", "螺旋弹簧", "弹簧", "压缩弹簧"],
+    "parameters": [
+      { "key": "length", "label": "Free length", "unit": "mm", "default": 1000, "min": 20, "max": 1500 },
+      { "key": "outerDiameter", "label": "Outer diameter", "unit": "mm", "default": 200, "min": 10, "max": 500 },
+      { "key": "wireDiameter", "label": "Wire diameter", "unit": "mm", "default": 12, "min": 0.5, "max": 60 },
+      { "key": "pitch", "label": "Pitch", "unit": "mm", "default": 80, "min": 2, "max": 300 }
+    ]
+  },
+  {
+    "id": "hinge_leaf",
+    "title": "Hinge Leaf",
+    "category": "Motion / Mounting",
+    "description": "Single hinge leaf with barrel and mounting holes.",
+    "examplePrompt": "Create a hinge leaf 80 mm long, 35 mm wide, 3 mm thick, with a 10 mm barrel.",
+    "aliases": ["hinge plate", "hinge half", "合页", "铰链叶片", "铰链板"],
+    "parameters": [
+      { "key": "length", "label": "Length", "unit": "mm", "default": 80, "min": 30, "max": 220 },
+      { "key": "width", "label": "Leaf width", "unit": "mm", "default": 35, "min": 15, "max": 120 },
+      { "key": "thickness", "label": "Leaf thickness", "unit": "mm", "default": 3, "min": 1, "max": 16 },
+      { "key": "barrelDiameter", "label": "Barrel diameter", "unit": "mm", "default": 10, "min": 3, "max": 40 },
+      { "key": "holeDiameter", "label": "Hole diameter", "unit": "mm", "default": 4, "min": 1, "max": 20 },
+      { "key": "edgeOffset", "label": "Hole offset", "unit": "mm", "default": 10, "min": 3, "max": 60 },
+      { "key": "chamfer", "label": "Chamfer", "unit": "mm", "default": 0.3, "min": 0, "max": 6 }
+    ]
+  },
+  {
+    "id": "bearing_mount_block",
+    "title": "Bearing Mount Block",
+    "category": "Motion / Mounting",
+    "description": "Rectangular bearing block with center bore and mounting holes.",
+    "examplePrompt": "Make a bearing mount block 90 x 45 x 40 mm with a 22 mm bore and 6 mm mounting holes.",
+    "aliases": ["bearing block", "pillow block", "bearing mount", "轴承座", "轴承安装块", "支座"],
+    "parameters": [
+      { "key": "length", "label": "Length", "unit": "mm", "default": 90, "min": 30, "max": 260 },
+      { "key": "width", "label": "Width", "unit": "mm", "default": 45, "min": 20, "max": 180 },
+      { "key": "height", "label": "Height", "unit": "mm", "default": 40, "min": 15, "max": 180 },
+      { "key": "boreDiameter", "label": "Bore diameter", "unit": "mm", "default": 22, "min": 3, "max": 120 },
+      { "key": "holeDiameter", "label": "Mount hole diameter", "unit": "mm", "default": 6, "min": 1, "max": 30 },
+      { "key": "edgeOffset", "label": "Mount offset", "unit": "mm", "default": 14, "min": 4, "max": 80 },
+      { "key": "chamfer", "label": "Chamfer", "unit": "mm", "default": 0.5, "min": 0, "max": 8 }
+    ]
+  }
+]

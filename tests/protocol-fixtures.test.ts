@@ -30,10 +30,11 @@ test("protocol boundary fixtures map to documented protocol cases", async () => 
   }
 });
 
-test("protocol boundary fixtures classify expected failures", async () => {
+test("protocol boundary fixtures classify any expected failures", async () => {
   const { classifyFailure } = await loadClassifyModule();
 
   for (const item of boundaryCases.filter((caseItem) => caseItem.expectedFailureClass === "expected_failure")) {
+    if (!("expectedErrorCode" in item)) continue;
     const result = classifyFailure({
       status: "failure",
       errorCode: item.expectedErrorCode,

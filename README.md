@@ -4,7 +4,7 @@ AI CAD Agent workspace built with Next.js, React, Three.js, and build123d.
 
 The product surface is intentionally user-facing: users start with natural language, then watch an agent workstream create an engineering spec, run the CAD kernel, validate geometry, and expose real artifacts for preview and download.
 
-Current stage: `v1.2 local password staging access`.
+Current stage: `v1.x common mechanical template expansion`.
 
 ## Product Shape
 
@@ -13,7 +13,7 @@ Current stage: `v1.2 local password staging access`.
 - Workstream: understanding request, engineering spec, build123d source, CAD kernel, STEP export, preview mesh, validation, packaging
 - CAD Canvas tabs: Preview, Drawing, Parameters, Files
 - No user-facing internal control panels
-- Supported CAD templates: `mounting_plate` and `l_bracket`
+- Supported CAD templates: 20 deterministic build123d templates, listed below
 - Upload sketch: visible as `Coming soon`, disabled until image-to-CAD is implemented
 - Recent projects, messages, revisions, and artifact metadata persist locally for alpha trials
 - Trial feedback captures thumbs up/down and optional comments without user accounts
@@ -25,7 +25,7 @@ Current stage: `v1.2 local password staging access`.
 Not currently supported:
 
 - Sketch/image upload to CAD
-- Arbitrary CAD parts beyond the supported templates
+- Arbitrary CAD parts beyond the supported templates, unless a future restricted `custom_build123d` sandbox is explicitly enabled
 - Assemblies
 - Complex production drawings
 - Public anonymous production traffic
@@ -55,10 +55,11 @@ This project must not fabricate CAD or agent results.
 
 ## Real CAD Artifacts
 
-The runner currently supports:
+The runner currently supports 20 real build123d templates:
 
-- `mounting_plate`: length, width, thickness, holeDiameter, edgeOffset, chamfer
-- `l_bracket`: length, height, width, thickness, holeDiameter, edgeOffset, chamfer
+`mounting_plate`, `l_bracket`, `gusset_plate`, `u_bracket`, `c_channel`, `angle_bracket_gusset`, `simple_enclosure`, `enclosure_lid`, `electronics_mounting_base`, `round_flange`, `rectangular_flange`, `stepped_shaft`, `spacer_standoff`, `bushing_sleeve`, `shaft_collar`, `pulley`, `spur_gear`, `helical_spring`, `hinge_leaf`, and `bearing_mount_block`.
+
+Template metadata lives in `cad_templates.json` and drives `/api/health.supportedTemplates`, the LLM planner prompt/schema, the dashboard cards, and the Python runner smoke coverage.
 
 The build123d runner writes real files under `outputs/cad/<revision>/`:
 
@@ -78,8 +79,7 @@ The build123d runner writes real files under `outputs/cad/<revision>/`:
 - STEP reload bounding box
 - solid count
 - face/edge count
-- cylindrical hole-face count
-- hole radius measurement
+- cylindrical face count
 - exported file sizes
 - partType check
 
@@ -161,7 +161,7 @@ npm run handoff:check
 npm run release:check
 ```
 
-CI runs `npm ci`, lint, typecheck, unit tests, production build, and Python build123d smoke tests for both `mounting_plate` and `l_bracket`. The runner smoke also checks `package.zip`.
+CI runs `npm ci`, lint, typecheck, unit tests, production build, and Python build123d smoke tests for all 20 supported templates. The runner smoke also checks `package.zip`.
 
 Local development URL:
 

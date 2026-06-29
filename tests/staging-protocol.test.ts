@@ -42,7 +42,7 @@ test("staging protocol dry-run parses the 20 prompt checklist and writes output"
   assert.equal(written.executed, false);
   assert.equal(written.protocol.length, 20);
   assert.equal(written.protocol[0].id, 1);
-  assert.equal(written.protocol[10].category, "revision");
+  assert.equal(written.protocol[17].category, "helical_spring success");
 
   await fs.rm(tempRoot, { recursive: true, force: true });
 });

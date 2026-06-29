@@ -6,6 +6,7 @@ import { HeroComposer } from "@/components/landing/HeroComposer";
 import { AgentThread, type ThreadMessage } from "@/components/agent/AgentThread";
 import { CADArtifactCanvas } from "@/components/cad/CADArtifactCanvas";
 import { createClientId } from "@/lib/client/ids";
+import { templateById } from "@/lib/cad/templates";
 import {
   WORKSTREAM_TEMPLATE,
   type CADArtifact,
@@ -552,13 +553,7 @@ function formatRevision(index: number) {
 }
 
 function promptForTemplate(template: string | undefined) {
-  if (template === "l_bracket") {
-    return "Make a 90 x 60 x 40 mm L bracket, 5 mm thick, 5 mm holes, 12 mm edge offset, and 1 mm chamfer";
-  }
-  if (template === "mounting_plate") {
-    return "Make a 120 x 80 x 4 mm mounting plate with four 4.5 mm holes, 10 mm edge offset, and 1 mm chamfer";
-  }
-  return undefined;
+  return templateById(template)?.examplePrompt;
 }
 
 async function safeResponseJSON(response: Response) {

@@ -32,6 +32,6 @@ test("failed agent runs can record model and unsupported partType without a revi
     assert.equal(record.status, "failure");
   } finally {
     process.chdir(originalCwd);
-    await fs.rm(tempDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 });
+    await fs.rm(tempDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }).catch(() => undefined);
   }
 });

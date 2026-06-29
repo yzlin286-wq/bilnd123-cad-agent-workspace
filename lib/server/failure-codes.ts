@@ -1,4 +1,5 @@
 import { errorGuidanceForCode } from "@/lib/agent/error-guidance";
+import { SUPPORTED_TEMPLATE_TEXT, templateExamplePrompts } from "@/lib/cad/templates";
 
 export function operationalErrorCode(error: unknown, fallback: string) {
   const message = error instanceof Error ? error.message : String(error || "");
@@ -6,6 +7,12 @@ export function operationalErrorCode(error: unknown, fallback: string) {
 
   if (/unsupported parttype|unsupported template|supported parttype values/.test(normalized)) {
     return "UNSUPPORTED_PART_TYPE";
+  }
+  if (/custom_codegen_disabled/.test(normalized)) {
+    return "CUSTOM_CODEGEN_DISABLED";
+  }
+  if (/custom_codegen_rejected/.test(normalized)) {
+    return "CUSTOM_CODEGEN_REJECTED";
   }
   if (
     /edgeoffset|hole radius|no usable area|chamfer is too large|must be positive|must be larger|parameter conflict|invalid dimension/.test(
@@ -34,13 +41,15 @@ export function operationalErrorCode(error: unknown, fallback: string) {
 
 const USER_MESSAGES: Record<string, string> = {
   UNSUPPORTED_PART_TYPE:
-    "This request is outside the supported staging templates. Supported templates: mounting_plate and l_bracket. Try: make a 120 x 80 x 4 mm mounting plate, or create a 90 x 60 x 40 mm L bracket.",
+    `This request is outside the supported staging templates. Supported templates: ${SUPPORTED_TEMPLATE_TEXT}. Try: ${templateExamplePrompts(2).join(" Or: ")}.`,
   PARAMETER_CONFLICT:
     "The requested dimensions conflict with the CAD template constraints. Try reducing edgeOffset, increasing the part dimensions, or reducing the hole diameter.",
   LLM_JSON_ERROR: "The AI model returned a spec the app could not validate. Please retry or contact the staging administrator.",
   CAD_RUNNER_CRASH: "The CAD kernel could not complete this run. Please retry once or contact the staging administrator.",
   VALIDATION_FAILED: "The CAD model was generated but failed geometry validation. Adjust the parameters or report this revision.",
   RATE_LIMITED: "Too many CAD requests. Please wait about a minute and try again.",
+  CUSTOM_CODEGEN_DISABLED: "Custom build123d generation is disabled in this staging environment. Use one of the supported templates.",
+  CUSTOM_CODEGEN_REJECTED: "Generated build123d source was rejected by safety or validation checks. Please use a supported template or contact the staging administrator.",
   CAD_ENGINE_NOT_CONNECTED: "CAD engine not connected. Connect build123d before rebuilding files.",
   AI_ENGINE_NOT_CONNECTED: "AI CAD engine not connected. Add your model endpoint before using natural language CAD.",
   INVALID_JSON: "Invalid request body. Send valid JSON and try again.",

@@ -13,6 +13,14 @@ test("operationalErrorCode classifies expected and unexpected staging failures",
     operationalErrorCode(new Error("build123d is not installed or cannot load Open Cascade."), "AGENT_RUN_FAILED"),
     "CAD_RUNNER_CRASH",
   );
+  assert.equal(
+    operationalErrorCode(new Error("CUSTOM_CODEGEN_DISABLED: Custom build123d code generation is disabled."), "AGENT_RUN_FAILED"),
+    "CUSTOM_CODEGEN_DISABLED",
+  );
+  assert.equal(
+    operationalErrorCode(new Error("CUSTOM_CODEGEN_REJECTED: generated source imports a forbidden module."), "AGENT_RUN_FAILED"),
+    "CUSTOM_CODEGEN_REJECTED",
+  );
   assert.equal(operationalErrorCode(new Error("something else"), "AGENT_RUN_FAILED"), "AGENT_RUN_FAILED");
 });
 
@@ -23,5 +31,7 @@ test("userMessageForErrorCode returns safe user-facing messages", () => {
   assert.match(userMessageForErrorCode("CAD_RUNNER_CRASH"), /CAD kernel could not complete/);
   assert.match(userMessageForErrorCode("VALIDATION_FAILED"), /failed geometry validation/);
   assert.match(userMessageForErrorCode("RATE_LIMITED"), /wait about a minute/);
+  assert.match(userMessageForErrorCode("CUSTOM_CODEGEN_DISABLED"), /disabled/);
+  assert.match(userMessageForErrorCode("CUSTOM_CODEGEN_REJECTED"), /rejected/);
   assert.equal(userMessageForErrorCode("AGENT_RUN_FAILED", "Safe fallback."), "Safe fallback.");
 });

@@ -40,4 +40,4 @@ Canvas expectations:
 
 ## Template Limits
 
-The only supported templates are `mounting_plate` and `l_bracket`. UI copy must not imply arbitrary CAD, sketch upload, or a third template is available.
+The supported template catalog is driven by `cad_templates.json` and currently contains 20 deterministic build123d templates. UI copy must not imply sketch upload or public arbitrary CAD is available.

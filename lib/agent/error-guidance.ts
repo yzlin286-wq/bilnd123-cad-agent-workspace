@@ -1,23 +1,30 @@
+import { SUPPORTED_TEMPLATE_TEXT, templateExamplePrompts } from "@/lib/cad/templates";
+
 export type ErrorGuidance = {
   title: string;
   message: string;
   suggestions: string[];
 };
 
-const SUPPORTED_TEMPLATE_TEXT = "Supported templates: mounting_plate and l_bracket.";
-
-const EXAMPLE_PROMPTS = [
-  "Make a 120 x 80 x 4 mm mounting plate with four 4.5 mm holes.",
-  "Create a 90 x 60 x 40 mm L bracket, 5 mm thick, with 5 mm holes.",
-];
-
 export function errorGuidanceForCode(errorCode?: string, fallbackMessage?: string): ErrorGuidance {
   switch (errorCode) {
     case "UNSUPPORTED_PART_TYPE":
       return {
         title: "Template not supported yet",
-        message: `${SUPPORTED_TEMPLATE_TEXT} No placeholder CAD was generated.`,
-        suggestions: EXAMPLE_PROMPTS,
+        message: `Supported templates: ${SUPPORTED_TEMPLATE_TEXT}. No placeholder CAD was generated.`,
+        suggestions: templateExamplePrompts(),
+      };
+    case "CUSTOM_CODEGEN_DISABLED":
+      return {
+        title: "Custom CAD generation is disabled",
+        message: "This staging environment only runs the supported template catalog. No fallback CAD was generated.",
+        suggestions: templateExamplePrompts(3),
+      };
+    case "CUSTOM_CODEGEN_REJECTED":
+      return {
+        title: "Generated CAD source was rejected",
+        message: "The generated build123d source did not pass safety or validation checks. No placeholder CAD was generated.",
+        suggestions: [],
       };
     case "PARAMETER_CONFLICT":
       return {

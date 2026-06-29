@@ -7,6 +7,7 @@ test("unsupported part type guidance names supported templates and examples", ()
 
   assert.match(guidance.message, /mounting_plate/);
   assert.match(guidance.message, /l_bracket/);
+  assert.match(guidance.message, /helical_spring/);
   assert.equal(guidance.suggestions.length >= 2, true);
 });
 

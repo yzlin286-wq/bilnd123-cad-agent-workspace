@@ -59,3 +59,42 @@ test("revision merge uses engineeringSpec only when no specDelta is returned", (
   assert.equal(merged.edgeOffset, 10);
   assert.equal(merged.chamfer, 1);
 });
+
+test("revision merge preserves template parameters and applies nested parameter deltas", () => {
+  const springSpec: EngineeringSpec = {
+    partType: "helical_spring",
+    length: 1000,
+    width: 200,
+    thickness: 12,
+    holeDiameter: 1,
+    edgeOffset: 1,
+    chamfer: 0,
+    material: "Spring steel",
+    units: "mm",
+    parameters: {
+      length: 1000,
+      outerDiameter: 200,
+      wireDiameter: 12,
+      pitch: 80,
+    },
+    outerDiameter: 200,
+    wireDiameter: 12,
+    pitch: 80,
+  };
+
+  const merged = mergeRevisionSpec({
+    currentSpec: springSpec,
+    specDelta: {
+      parameters: {
+        wireDiameter: 10,
+      },
+    },
+  });
+
+  assert.equal(merged.partType, "helical_spring");
+  assert.equal(merged.parameters?.length, 1000);
+  assert.equal(merged.parameters?.outerDiameter, 200);
+  assert.equal(merged.parameters?.pitch, 80);
+  assert.equal(merged.parameters?.wireDiameter, 10);
+  assert.equal(merged.wireDiameter, 10);
+});

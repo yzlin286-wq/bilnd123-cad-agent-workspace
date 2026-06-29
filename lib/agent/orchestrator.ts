@@ -4,10 +4,11 @@ import { EngineeringSpec } from "@/lib/agent/spec";
 import { runCADKernel, CADRunnerNotConfiguredError } from "@/lib/cad/cad-runner-client";
 import { findArtifact } from "@/lib/cad/artifacts";
 import { mergeRevisionSpec, normalizeSpec } from "@/lib/agent/spec-merge";
-import { callSpecRevisionPlanner, callWorkstreamPlanner, repairJSONCandidate } from "@/lib/server/openai-compatible";
+import { callCustomBuild123dPlanner, callSpecRevisionPlanner, callWorkstreamPlanner, repairJSONCandidate } from "@/lib/server/openai-compatible";
 import { operationalErrorCode, userMessageForErrorCode } from "@/lib/server/failure-codes";
 import { getRuntimeConfig, isLLMConfigured } from "@/lib/server/runtime";
 import { appendRunHistory, type RunHistoryRoute } from "@/lib/server/run-history";
+import { SUPPORTED_TEMPLATE_ID_SET, SUPPORTED_TEMPLATE_TEXT } from "@/lib/cad/templates";
 
 type Emit = (event: AgentEvent) => void | Promise<void>;
 type RunContext = {
@@ -288,11 +289,33 @@ async function createEngineeringSpec(prompt: string): Promise<{ spec: Engineerin
     return { spec: normalizeSpec(raw), model: result.model };
   } catch (error) {
     const raw = safeExtractRaw(result.content);
+    if (process.env.CAD_ENABLE_CUSTOM_CODEGEN === "1" && raw && shouldTryCustomBuild123d(raw)) {
+      return createCustomBuild123dSpec(prompt);
+    }
     throw withPlanningContext(error, {
       model: result.model,
       partType: raw ? partTypeFromRecord(raw) : undefined,
     });
   }
+}
+
+async function createCustomBuild123dSpec(prompt: string): Promise<{ spec: EngineeringSpec; model: string }> {
+  const result = await callCustomBuild123dPlanner({
+    prompt,
+    config: getRuntimeConfig(),
+  });
+  const payload = extractJSON(result.content);
+  const raw = payload.engineeringSpec ?? payload.spec ?? payload;
+  if (!isRecord(raw)) {
+    throw withPlanningContext(new Error("AI model returned an invalid custom build123d spec."), {
+      model: result.model,
+      partType: "custom_build123d",
+    });
+  }
+  return {
+    spec: normalizeSpec({ ...raw, partType: "custom_build123d" }),
+    model: result.model,
+  };
 }
 
 async function reviseEngineeringSpec({
@@ -339,11 +362,21 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function rejectUnsupportedPartType(raw: Record<string, unknown>) {
   const partType = partTypeFromRecord(raw);
-  if (partType !== "mounting_plate" && partType !== "l_bracket") {
-    const error = new Error(`Unsupported partType '${partType}'. Supported partType values: mounting_plate, l_bracket.`) as PlanningContextError;
+  if (partType === "custom_build123d" && process.env.CAD_ENABLE_CUSTOM_CODEGEN !== "1") {
+    const error = new Error("CUSTOM_CODEGEN_DISABLED: Custom build123d code generation is disabled for this staging environment.") as PlanningContextError;
     error.partType = partType;
     throw error;
   }
+  if (!SUPPORTED_TEMPLATE_ID_SET.has(partType)) {
+    const error = new Error(`Unsupported partType '${partType}'. Supported partType values: ${SUPPORTED_TEMPLATE_TEXT}.`) as PlanningContextError;
+    error.partType = partType;
+    throw error;
+  }
+}
+
+function shouldTryCustomBuild123d(raw: Record<string, unknown>) {
+  const partType = partTypeFromRecord(raw);
+  return partType !== "custom_build123d" && !SUPPORTED_TEMPLATE_ID_SET.has(partType);
 }
 
 function partTypeFromRecord(raw: Record<string, unknown>) {

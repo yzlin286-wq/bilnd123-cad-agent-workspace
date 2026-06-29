@@ -70,7 +70,7 @@ If the failure is caused by build123d geometry, validation, artifact packaging, 
 3. Assert `validation.json` behavior and generated artifact presence.
 4. If the expected result is failure, assert the runner exits non-zero with a friendly error rather than producing fake CAD.
 
-Do this only for `mounting_plate` and `l_bracket`; do not add a new CAD template as part of triage.
+Do this only for templates already listed in `cad_templates.json`; do not add a new CAD template as part of triage.
 
 ## 5. Add Spec Merge Regressions To Unit Tests
 

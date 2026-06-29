@@ -2,12 +2,9 @@
 
 import { useState } from "react";
 import { ArrowUp, ImagePlus, Sparkles } from "lucide-react";
+import { templateExamplePrompts } from "@/lib/cad/templates";
 
-const examples = [
-  "Make a 120 x 80 x 4 mm mounting plate with four M4 holes",
-  "Create a 90 x 60 x 5 mm mounting plate with 6 mm holes and 8 mm edge offset",
-  "Create an 80 x 60 x 40 mm L bracket, 5 mm thick, with 5 mm mounting holes",
-];
+const examples = templateExamplePrompts(6);
 
 export function HeroComposer({ initialPrompt, onGenerate }: { initialPrompt?: string; onGenerate: (prompt: string) => void }) {
   const [prompt, setPrompt] = useState(initialPrompt || examples[0]);

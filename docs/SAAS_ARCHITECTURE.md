@@ -4,10 +4,7 @@ Current stage: `v1.2 local password staging access`.
 
 ## Scope
 
-The product is moving from internal alpha workspace to a controlled SaaS foundation. The supported CAD templates remain:
-
-- `mounting_plate`
-- `l_bracket`
+The product is moving from internal alpha workspace to a controlled SaaS foundation. The supported CAD templates are driven by `cad_templates.json` and currently cover 20 deterministic build123d mechanical templates.
 
 Not supported in this stage:
 

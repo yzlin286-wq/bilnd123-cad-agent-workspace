@@ -112,7 +112,7 @@ In Docker, use:
 CAD_RUNNER_COMMAND=/app/.venv/bin/python scripts/run_build123d.py
 ```
 
-The runner produces real `STEP`, `STL`, `SVG`, `source.py`, `validation.json`, `manifest.json`, and `package.zip` files. If build123d cannot run, the app returns a friendly error and does not fabricate artifacts.
+The runner produces real `STEP`, `STL`, `SVG`, `source.py`, `validation.json`, `manifest.json`, and `package.zip` files for every template listed in `cad_templates.json`. If build123d cannot run, the app returns a friendly error and does not fabricate artifacts.
 
 ## Basic Auth
 
@@ -245,7 +245,7 @@ STAGING_BASIC_AUTH_PASSWORD=... \
 npm run smoke:staging -- --output outputs/smoke/latest.json
 ```
 
-The smoke script checks `/api/health`, creates a `mounting_plate`, revises thickness to `6 mm`, verifies unchanged dimensions, downloads generated artifacts including `package.zip`, and verifies the ZIP file contains the expected CAD files.
+The staging smoke script checks `/api/health`, creates a `mounting_plate`, revises thickness to `6 mm`, verifies unchanged dimensions, downloads generated artifacts including `package.zip`, and verifies the ZIP file contains the expected CAD files. The Python runner smoke separately covers all 20 deterministic templates from `cad_templates.json`.
 
 ## v1.2 Handoff Gate
 

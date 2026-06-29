@@ -53,26 +53,4 @@ jobs:
         run: python -m pip install -r requirements.txt
 
       - name: Run CAD runner smoke test
-        run: |
-          echo '{"spec":{"partType":"mounting_plate","length":120,"width":80,"thickness":4,"holeDiameter":4.5,"edgeOffset":10,"chamfer":1}}' | python scripts/run_build123d.py | tee runner-output-mounting-plate.json
-          echo '{"spec":{"partType":"l_bracket","length":80,"height":60,"width":40,"thickness":5,"holeDiameter":5,"edgeOffset":10,"chamfer":1}}' | python scripts/run_build123d.py | tee runner-output-l-bracket.json
-          python - <<'PY'
-          import json
-          from pathlib import Path
-
-          for output_name, part_type in [
-              ("runner-output-mounting-plate.json", "mounting_plate"),
-              ("runner-output-l-bracket.json", "l_bracket"),
-          ]:
-              payload = json.loads(Path(output_name).read_text())
-              assert payload["ok"], payload
-              validation_path = Path(payload["artifacts"]["validation"])
-              validation = json.loads(validation_path.read_text())
-              assert validation["passed"], validation
-              assert validation["metrics"]["partType"] == part_type
-              assert Path(payload["artifacts"]["step"]).stat().st_size > 0
-              assert Path(payload["artifacts"]["stl"]).stat().st_size > 0
-              assert Path(payload["artifacts"]["package"]).stat().st_size > 0
-              manifest = json.loads(Path(payload["artifacts"]["manifest"]).read_text())
-              assert any(item["kind"] == "package" and item["name"] == "package.zip" for item in manifest["artifacts"])
-          PY
+        run: python scripts/smoke_build123d_templates.py

@@ -21,8 +21,13 @@ export function ParameterControls({
 
   const nextSpec = useMemo(() => {
     if (!spec) return undefined;
+    const nextParameters = {
+      ...(spec.parameters ?? {}),
+      ...draft,
+    };
     return {
       ...spec,
+      parameters: nextParameters,
       ...draft,
     } as EngineeringSpec;
   }, [draft, spec]);

@@ -9,6 +9,7 @@ export type WorkstreamStep = {
 
 export type EngineeringSpec = {
   partType: "mounting_plate" | "l_bracket" | string;
+  parameters?: Record<string, number | string | boolean>;
   length: number;
   height?: number;
   width: number;
@@ -18,6 +19,7 @@ export type EngineeringSpec = {
   chamfer: number;
   material: string;
   units: "mm" | "inch" | string;
+  [key: string]: number | string | boolean | Record<string, number | string | boolean> | undefined;
 };
 
 export type ParameterManifestItem = {

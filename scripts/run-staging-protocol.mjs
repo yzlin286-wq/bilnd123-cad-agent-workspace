@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { promises as fs } from "node:fs";
+import { promises as fs, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { listZipEntries } from "./zip-entries.mjs";
@@ -9,6 +9,7 @@ const DEFAULT_OUTPUT_PATH = path.resolve(process.cwd(), "outputs", "protocol", "
 const DEFAULT_EXECUTE_DELAY_MS = 6500;
 const REQUIRED_ARTIFACT_KINDS = ["step", "stl", "drawingSvg", "source", "spec", "validation", "manifest", "package"];
 const REQUIRED_PACKAGE_ENTRIES = ["model.step", "model.stl", "drawing.svg", "source.py", "spec.json", "validation.json", "manifest.json"];
+const TEMPLATE_IDS = JSON.parse(readFileSync(new URL("../cad_templates.json", import.meta.url), "utf8")).map((template) => template.id);
 
 const REVISION_CASES = {
   11: {
@@ -408,6 +409,8 @@ function parseSSE(text) {
 }
 
 function expectedPartTypeFor(item) {
+  const match = TEMPLATE_IDS.find((id) => item.category.startsWith(id));
+  if (match) return match;
   if (item.category.startsWith("l_bracket")) return "l_bracket";
   return "mounting_plate";
 }

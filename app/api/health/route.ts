@@ -1,12 +1,12 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { CAD_OUTPUT_ROOT } from "@/lib/cad/artifacts";
+import { SUPPORTED_TEMPLATE_IDS } from "@/lib/cad/templates";
 import { getDataLayerStatus } from "@/lib/server/data-layer";
 import { isCADRunnerConfigured, isLLMConfigured } from "@/lib/server/runtime";
 
 export const runtime = "nodejs";
 
-const supportedTemplates = ["mounting_plate", "l_bracket"];
 const accessModes = new Set(["https", "private_network_or_tunnel", "http_restricted", "unknown"]);
 
 export async function GET() {
@@ -32,7 +32,7 @@ export async function GET() {
     auth,
     dataLayer,
     build,
-    supportedTemplates,
+    supportedTemplates: SUPPORTED_TEMPLATE_IDS,
   });
 }
 

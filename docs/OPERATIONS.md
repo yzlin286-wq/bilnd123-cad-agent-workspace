@@ -123,11 +123,10 @@ Actions:
 
 - Rebuild the Docker image.
 - Confirm `requirements.txt` installs inside `/app/.venv`.
-- Run a direct smoke command inside the container:
+- Run the full deterministic template smoke inside the container:
 
 ```bash
-echo '{"spec":{"partType":"mounting_plate","length":120,"width":80,"thickness":4,"holeDiameter":4.5,"edgeOffset":10,"chamfer":1}}' \
-  | /app/.venv/bin/python scripts/run_build123d.py
+/app/.venv/bin/python scripts/smoke_build123d_templates.py
 ```
 
 ### LLM JSON Schema Compatibility
@@ -142,10 +141,7 @@ Actions:
 
 ### Unsupported Template
 
-Only these `partType` values are supported:
-
-- `mounting_plate`
-- `l_bracket`
+Supported `partType` values are listed in `cad_templates.json` and exposed through authenticated `/api/health.supportedTemplates`.
 
 Unsupported templates fail with a user-readable error and do not generate placeholder CAD.
 
